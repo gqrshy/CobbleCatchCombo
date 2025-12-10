@@ -1,18 +1,18 @@
 package com.pokemon.catchcombo.display
 
+import com.cobblemon.mod.common.api.pokemon.PokemonSpecies
 import com.pokemon.catchcombo.config.CatchComboConfig
 import com.pokemon.catchcombo.lang.LanguageManager
 import com.pokemon.catchcombo.service.BonusCalculator
 import com.pokemon.catchcombo.service.ComboManager
 import net.minecraft.entity.boss.BossBar
 import net.minecraft.entity.boss.ServerBossBar
+import net.minecraft.server.MinecraftServer
 import net.minecraft.server.network.ServerPlayerEntity
 import net.minecraft.text.Text
+import net.minecraft.util.Identifier
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
-import java.util.concurrent.ScheduledFuture
-import java.util.concurrent.TimeUnit
 
 class DisplayManager(
     private val config: CatchComboConfig,
@@ -20,9 +20,13 @@ class DisplayManager(
     private val bonusCalculator: BonusCalculator
 ) {
     private val playerBossBars = ConcurrentHashMap<UUID, ServerBossBar>()
-    private val hideTimers = ConcurrentHashMap<UUID, ScheduledFuture<*>>()
-    private val scheduler = Executors.newSingleThreadScheduledExecutor { r ->
-        Thread(r, "CobbleCatchCombo-Display").apply { isDaemon = true }
+    private val hideScheduledTicks = ConcurrentHashMap<UUID, Long>()
+
+    // Server reference for main thread execution
+    private var server: MinecraftServer? = null
+
+    fun setServer(server: MinecraftServer) {
+        this.server = server
     }
 
     fun showComboDisplay(player: ServerPlayerEntity, captureResult: ComboManager.CaptureResult) {
@@ -40,9 +44,6 @@ class DisplayManager(
     private fun showBossBar(player: ServerPlayerEntity, result: ComboManager.CaptureResult, speciesName: String) {
         val uuid = player.uuid
         val locale = languageManager.getPlayerLocale(player)
-
-        // Cancel existing hide timer
-        hideTimers.remove(uuid)?.cancel(false)
 
         // Get or create boss bar
         val bossBar = playerBossBars.getOrPut(uuid) {
@@ -80,12 +81,30 @@ class DisplayManager(
             bossBar.addPlayer(player)
         }
 
-        // Schedule hide
-        val hideDelay = config.display.bossBar.showDurationSeconds.toLong()
-        val hideFuture = scheduler.schedule({
+        // Schedule hide using server ticks (20 ticks = 1 second)
+        val hideDelayTicks = config.display.bossBar.showDurationSeconds * 20L
+        val currentTick = server?.overworld?.time ?: 0L
+        hideScheduledTicks[uuid] = currentTick + hideDelayTicks
+    }
+
+    /**
+     * Called every server tick to handle boss bar hiding.
+     * This ensures boss bar operations happen on the main thread.
+     */
+    fun tick() {
+        val currentTick = server?.overworld?.time ?: return
+
+        val toRemove = mutableListOf<UUID>()
+        hideScheduledTicks.forEach { (uuid, hideTick) ->
+            if (currentTick >= hideTick) {
+                toRemove.add(uuid)
+            }
+        }
+
+        toRemove.forEach { uuid ->
+            hideScheduledTicks.remove(uuid)
             hideBossBar(uuid)
-        }, hideDelay, TimeUnit.SECONDS)
-        hideTimers[uuid] = hideFuture
+        }
     }
 
     private fun showActionBar(player: ServerPlayerEntity, result: ComboManager.CaptureResult, speciesName: String) {
@@ -209,7 +228,7 @@ class DisplayManager(
     }
 
     fun removePlayer(playerUuid: UUID) {
-        hideTimers.remove(playerUuid)?.cancel(false)
+        hideScheduledTicks.remove(playerUuid)
         hideBossBar(playerUuid)
     }
 
@@ -230,17 +249,33 @@ class DisplayManager(
     }
 
     private fun formatSpeciesName(speciesId: String): String {
-        // Convert "cobblemon:eevee" to "Eevee"
+        // Try to get the translated species name from Cobblemon
+        return try {
+            val identifier = Identifier.tryParse(speciesId)
+            if (identifier != null) {
+                val species = PokemonSpecies.getByIdentifier(identifier)
+                species?.translatedName?.string ?: fallbackFormatName(speciesId)
+            } else {
+                fallbackFormatName(speciesId)
+            }
+        } catch (e: Exception) {
+            fallbackFormatName(speciesId)
+        }
+    }
+
+    private fun fallbackFormatName(speciesId: String): String {
+        // Fallback: Convert "cobblemon:galarian_ponyta" to "Galarian Ponyta"
         val name = speciesId.substringAfter(":")
-        return name.replaceFirstChar { it.uppercase() }
+        return name.split("_").joinToString(" ") { word ->
+            word.replaceFirstChar { it.uppercase() }
+        }
     }
 
     fun shutdown() {
-        scheduler.shutdown()
         playerBossBars.values.forEach { it.clearPlayers() }
         playerBossBars.clear()
-        hideTimers.values.forEach { it.cancel(false) }
-        hideTimers.clear()
+        hideScheduledTicks.clear()
+        server = null
     }
 
     companion object {

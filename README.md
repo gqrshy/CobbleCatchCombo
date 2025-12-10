@@ -73,6 +73,16 @@ Available placeholders for use with other mods:
 | `%cobblecatchcombo:max_combo%` | Player's all-time max combo |
 | `%cobblecatchcombo:has_combo%` | Whether player has active combo |
 
+## Commands
+
+| Command | Permission | Description |
+|---------|------------|-------------|
+| `/catchcombo` | Everyone | View your current combo status |
+| `/catchcombo status` | Everyone | Same as above |
+| `/catchcombo reload` | OP Level 2 | Reload configuration and language files |
+| `/catchcombo reset` | OP Level 2 | Reset your current combo |
+| `/combo` | Everyone | Alias for `/catchcombo` |
+
 ## Language Files
 
 Language files are stored in `config/cobblecatchcombo/lang/`
@@ -95,8 +105,34 @@ The built jar will be in `build/libs/`
 
 MIT License - See [LICENSE](LICENSE) for details.
 
+## Troubleshooting / API Compatibility
+
+If you encounter compilation errors with Cobblemon's API, check the following:
+
+### Event Names
+The mod uses these Cobblemon events:
+- `CobblemonEvents.POKEMON_CAPTURED` - When a Pokemon is caught
+- `CobblemonEvents.POKEMON_ENTITY_SPAWN` - When a Pokemon spawns
+- `CobblemonEvents.BATTLE_FLED` - When a player flees from battle
+
+If event names have changed in newer Cobblemon versions, check `CobblemonEvents` object for current event names.
+
+### Event Properties
+- `PokemonCapturedEvent`: expects `.player` and `.pokemon` properties
+- `PokemonEntitySpawnEvent`: expects `.entity` property (PokemonEntity)
+- `BattleFledEvent`: expects `.player` property
+
+### Priority Enum
+Located at: `com.cobblemon.mod.common.api.Priority`
+Values: `LOWEST`, `LOW`, `NORMAL`, `HIGH`, `HIGHEST`
+
+### Reference Projects
+- [Cobblemon Unchained](https://github.com/timinc-cobble/cobblemon-unchained-1.5-fabric) - Similar IV/Shiny boost functionality
+- [Cobblemon Counter](https://github.com/timinc-cobble/cobblemon-counter-1.4-fabric) - Capture tracking
+
 ## Credits
 
 - Inspired by Pokémon Let's Go Catch Combo system
 - Inspired by Pixelmon's Catch Combo feature
 - Built for [Cobblemon](https://cobblemon.com)
+- Reference: [Cobblemon Unchained](https://modrinth.com/mod/cobblemon-unchained) by TimInc

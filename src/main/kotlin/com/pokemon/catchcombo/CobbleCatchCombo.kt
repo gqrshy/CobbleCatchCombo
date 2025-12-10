@@ -1,5 +1,6 @@
 package com.pokemon.catchcombo
 
+import com.pokemon.catchcombo.command.CatchComboCommands
 import com.pokemon.catchcombo.config.ConfigManager
 import com.pokemon.catchcombo.data.SQLiteRepository
 import com.pokemon.catchcombo.display.DisplayManager
@@ -10,7 +11,9 @@ import com.pokemon.catchcombo.service.BonusCalculator
 import com.pokemon.catchcombo.service.ComboManager
 import com.pokemon.catchcombo.service.SpawnModifier
 import net.fabricmc.api.ModInitializer
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
 import net.fabricmc.loader.api.FabricLoader
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
@@ -74,11 +77,23 @@ object CobbleCatchCombo : ModInitializer {
             LOGGER.info("Server starting, initializing database...")
             val repository = SQLiteRepository(configDir.resolve("data"))
             comboManager.initialize(repository)
+            displayManager.setServer(server)
         }
 
         ServerLifecycleEvents.SERVER_STOPPING.register { server ->
             LOGGER.info("Server stopping, saving data...")
             comboManager.shutdown()
+            displayManager.shutdown()
+        }
+
+        // Register tick event for display manager
+        ServerTickEvents.END_SERVER_TICK.register { server ->
+            displayManager.tick()
+        }
+
+        // Register commands
+        CommandRegistrationCallback.EVENT.register { dispatcher, registryAccess, environment ->
+            CatchComboCommands.register(dispatcher)
         }
 
         // Register Cobblemon event handlers
@@ -95,4 +110,12 @@ object CobbleCatchCombo : ModInitializer {
     }
 
     fun isCobblemonLoaded(): Boolean = cobblemonLoaded
+
+    fun reloadConfig() {
+        configManager.reloadConfig()
+        languageManager.loadLanguages()
+        // Update bonus calculator with new config
+        bonusCalculator = BonusCalculator(configManager.config)
+        LOGGER.info("Configuration reloaded")
+    }
 }

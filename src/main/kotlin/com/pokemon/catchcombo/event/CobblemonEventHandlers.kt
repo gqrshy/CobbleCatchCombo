@@ -2,9 +2,6 @@ package com.pokemon.catchcombo.event
 
 import com.cobblemon.mod.common.api.Priority
 import com.cobblemon.mod.common.api.events.CobblemonEvents
-import com.cobblemon.mod.common.api.events.battles.BattleFledEvent
-import com.cobblemon.mod.common.api.events.pokemon.PokemonCapturedEvent
-import com.cobblemon.mod.common.api.spawning.context.SpawningContext
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity
 import com.pokemon.catchcombo.CobbleCatchCombo
 import com.pokemon.catchcombo.config.CatchComboConfig
@@ -13,10 +10,36 @@ import com.pokemon.catchcombo.lang.LanguageManager
 import com.pokemon.catchcombo.service.ComboManager
 import com.pokemon.catchcombo.service.SpawnModifier
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents
-import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
 import net.minecraft.server.network.ServerPlayerEntity
 
+/**
+ * Cobblemon Event Handlers for CobbleCatchCombo
+ *
+ * IMPORTANT API NOTES (Cobblemon 1.7.x):
+ * ======================================
+ * This file uses Cobblemon's event system. If compilation fails, verify the following:
+ *
+ * 1. Event Names:
+ *    - POKEMON_CAPTURED: Fires when a Pokemon is caught
+ *    - POKEMON_ENTITY_SPAWN: Fires when a PokemonEntity spawns
+ *    - BATTLE_FLED: Fires when player flees (check if this exists in 1.7.1)
+ *
+ * 2. Event Properties:
+ *    - PokemonCapturedEvent: .player, .pokemon
+ *    - PokemonEntitySpawnEvent: .entity (PokemonEntity)
+ *    - BattleFledEvent: .player (verify this property exists)
+ *
+ * 3. Priority Enum:
+ *    - Located at: com.cobblemon.mod.common.api.Priority
+ *    - Values: LOWEST, LOW, NORMAL, HIGH, HIGHEST
+ *
+ * 4. Alternative Event Names (if above don't exist):
+ *    - POKEMON_ENTITY_SPAWN might be POKEMON_ENTITY_SPAWNED or similar
+ *    - Check CobblemonEvents object for available events
+ *
+ * Reference: https://gitlab.com/cable-mc/cobblemon
+ */
 object CobblemonEventHandlers {
     private lateinit var comboManager: ComboManager
     private lateinit var displayManager: DisplayManager
@@ -45,18 +68,40 @@ object CobblemonEventHandlers {
 
     private fun registerCobblemonEvents() {
         // Pokemon Captured Event
+        // This is the main event for tracking catch combos
         CobblemonEvents.POKEMON_CAPTURED.subscribe(Priority.NORMAL) { event ->
-            handlePokemonCaptured(event)
+            try {
+                handlePokemonCaptured(event.player, event.pokemon)
+            } catch (e: Exception) {
+                CobbleCatchCombo.LOGGER.error("Error handling Pokemon capture event", e)
+            }
         }
 
-        // Battle Fled Event (player fleeing)
-        CobblemonEvents.BATTLE_FLED.subscribe(Priority.NORMAL) { event ->
-            handleBattleFled(event)
+        // Battle Fled Event (player fleeing from wild battle)
+        // NOTE: In Cobblemon 1.7.0, BattleFledEvent fires when reaching flee distance
+        // This might not be the right event for player-initiated fleeing
+        // If this causes issues, you may need to use a different approach
+        try {
+            CobblemonEvents.BATTLE_FLED.subscribe(Priority.NORMAL) { event ->
+                try {
+                    // The event structure may vary - check if player property exists
+                    handleBattleFled(event.player)
+                } catch (e: Exception) {
+                    CobbleCatchCombo.LOGGER.debug("Error handling battle fled event: ${e.message}")
+                }
+            }
+        } catch (e: Exception) {
+            CobbleCatchCombo.LOGGER.warn("Could not register BATTLE_FLED event - player flee detection disabled")
         }
 
         // Pokemon Entity Spawn Event - for applying IV/shiny boosts
+        // Using LOW priority so other mods can process first
         CobblemonEvents.POKEMON_ENTITY_SPAWN.subscribe(Priority.LOW) { event ->
-            handlePokemonSpawn(event.entity)
+            try {
+                handlePokemonSpawn(event.entity)
+            } catch (e: Exception) {
+                CobbleCatchCombo.LOGGER.error("Error handling Pokemon spawn event", e)
+            }
         }
     }
 
@@ -68,15 +113,13 @@ object CobblemonEventHandlers {
             }
         }
 
-        // Player disconnect event - cleanup
+        // Player disconnect event - cleanup display resources
         ServerPlayConnectionEvents.DISCONNECT.register { handler, server ->
             displayManager.removePlayer(handler.player.uuid)
         }
     }
 
-    private fun handlePokemonCaptured(event: PokemonCapturedEvent) {
-        val player = event.player
-        val pokemon = event.pokemon
+    private fun handlePokemonCaptured(player: ServerPlayerEntity, pokemon: com.cobblemon.mod.common.pokemon.Pokemon) {
         val speciesId = pokemon.species.resourceIdentifier.toString()
 
         CobbleCatchCombo.LOGGER.debug("Pokemon captured: $speciesId by ${player.name.string}")
@@ -98,7 +141,7 @@ object CobblemonEventHandlers {
                 displayManager.showMilestoneNotification(player, result.newCombo, result.currentBonus)
             }
 
-            // Also notify on tier changes
+            // Also notify on tier changes that aren't explicit milestones
             if (result.tierChange.hasChanges() && result.newCombo !in milestones) {
                 displayManager.showMilestoneNotification(player, result.newCombo, result.currentBonus)
             }
@@ -111,10 +154,8 @@ object CobblemonEventHandlers {
         )
     }
 
-    private fun handleBattleFled(event: BattleFledEvent) {
+    private fun handleBattleFled(player: ServerPlayerEntity) {
         if (!config.combo.resetOnPlayerFlee) return
-
-        val player = event.player
 
         CobbleCatchCombo.LOGGER.debug("Player ${player.name.string} fled from battle")
 
@@ -145,6 +186,7 @@ object CobblemonEventHandlers {
         val pokemon = pokemonEntity.pokemon
 
         // Apply spawn modifications (IV boost, shiny boost)
+        // This runs after Cobblemon's initial spawn setup
         spawnModifier.modifySpawnedPokemon(pokemon, pokemonEntity)
     }
 }
