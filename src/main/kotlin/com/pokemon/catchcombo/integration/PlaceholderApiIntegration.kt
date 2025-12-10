@@ -1,5 +1,6 @@
 package com.pokemon.catchcombo.integration
 
+import com.cobblemon.mod.common.Cobblemon
 import com.cobblemon.mod.common.api.pokemon.PokemonSpecies
 import com.pokemon.catchcombo.CobbleCatchCombo
 import com.pokemon.catchcombo.lang.LanguageManager
@@ -16,8 +17,16 @@ class PlaceholderApiIntegration(
     private val bonusCalculator: BonusCalculator,
     private val languageManager: LanguageManager
 ) {
-    companion object {
-        private const val BASE_SHINY_RATE = 4096
+    /**
+     * Get the base shiny rate from Cobblemon's config.
+     * Default is 8192 (1/8192 chance).
+     */
+    private fun getBaseShinyRate(): Double {
+        return try {
+            Cobblemon.config.shinyRate.toDouble()
+        } catch (e: Exception) {
+            8192.0 // Fallback to Cobblemon's default
+        }
     }
 
     fun register() {
@@ -52,9 +61,10 @@ class PlaceholderApiIntegration(
 
         // %cobblecatchcombo:shiny_rate%
         registerPlaceholder("shiny_rate") { ctx ->
-            val player = ctx.player() ?: return@registerPlaceholder PlaceholderResult.value(Text.literal(BASE_SHINY_RATE.toString()))
+            val baseRate = getBaseShinyRate()
+            val player = ctx.player() ?: return@registerPlaceholder PlaceholderResult.value(Text.literal(baseRate.toInt().toString()))
             val bonus = comboManager.getCurrentBonus(player.uuid)
-            val rate = (BASE_SHINY_RATE / bonus.shinyMultiplier).toInt()
+            val rate = (baseRate / bonus.shinyMultiplier).toInt()
             PlaceholderResult.value(Text.literal(rate.toString()))
         }
 

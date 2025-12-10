@@ -70,7 +70,8 @@ object CobbleCatchCombo : ModInitializer {
         // Register spawn influence with Cobblemon's spawning system
         // This is the correct approach for modifying spawns BEFORE Pokemon creation
         // Reference: Cobblemon Unchained implementation
-        SpawnInfluenceRegistrar.register(configManager.config, comboManager, bonusCalculator)
+        // NOTE: SpawnInfluence fetches config/managers from CobbleCatchCombo at runtime
+        SpawnInfluenceRegistrar.register()
 
         // Register server lifecycle events
         ServerLifecycleEvents.SERVER_STARTING.register { server ->

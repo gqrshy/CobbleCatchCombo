@@ -2,6 +2,7 @@ package com.pokemon.catchcombo.event
 
 import com.cobblemon.mod.common.api.Priority
 import com.cobblemon.mod.common.api.events.CobblemonEvents
+import com.cobblemon.mod.common.battles.actor.PlayerBattleActor
 import com.pokemon.catchcombo.CobbleCatchCombo
 import com.pokemon.catchcombo.config.CatchComboConfig
 import com.pokemon.catchcombo.display.DisplayManager
@@ -94,6 +95,39 @@ object CobblemonEventHandlers {
             CobbleCatchCombo.LOGGER.warn("Could not register BATTLE_FLED event - player flee detection disabled")
         }
 
+        // Battle Victory Event (when player defeats wild Pokemon without capturing)
+        // This resets the combo if the player wins a wild battle without capturing
+        try {
+            CobblemonEvents.BATTLE_VICTORY.subscribe(Priority.NORMAL) { event ->
+                try {
+                    // Only handle if config says to reset on wild defeat
+                    if (!config.combo.resetOnWildDefeat) return@subscribe
+
+                    // Skip if this was a capture - combo is already handled by POKEMON_CAPTURED
+                    if (event.wasWildCapture) return@subscribe
+
+                    // Check if this was a wild battle that the player won
+                    // Look for player winners and check if there were wild pokemon losers
+                    val playerWinners = event.winners.filterIsInstance<PlayerBattleActor>()
+                    val hasWildLosers = event.battle.actors.any { actor ->
+                        actor !is PlayerBattleActor && event.losers.contains(actor)
+                    }
+
+                    if (playerWinners.isNotEmpty() && hasWildLosers) {
+                        // Player defeated wild Pokemon without capturing - reset combo
+                        for (playerActor in playerWinners) {
+                            val player = playerActor.entity ?: continue
+                            handleWildDefeat(player)
+                        }
+                    }
+                } catch (e: Exception) {
+                    CobbleCatchCombo.LOGGER.debug("Error handling battle victory event: ${e.message}")
+                }
+            }
+        } catch (e: Exception) {
+            CobbleCatchCombo.LOGGER.warn("Could not register BATTLE_VICTORY event - wild defeat detection disabled")
+        }
+
         // NOTE: Spawn modification (shiny/IV boosts) is now handled by
         // CatchComboSpawnInfluence using Cobblemon's SpawningInfluence system.
         // This provides proper timing (before Pokemon creation) and uses
@@ -172,6 +206,19 @@ object CobblemonEventHandlers {
             displayManager.showComboBreakNotification(player, resetResult.previousCombo, resetResult.previousSpecies)
             CobbleCatchCombo.LOGGER.debug(
                 "Combo reset for ${player.name.string} due to death: " +
+                "${resetResult.previousSpecies} x${resetResult.previousCombo}"
+            )
+        }
+    }
+
+    private fun handleWildDefeat(player: ServerPlayerEntity) {
+        CobbleCatchCombo.LOGGER.debug("Player ${player.name.string} defeated wild Pokemon without capturing")
+
+        val resetResult = comboManager.resetCombo(player.uuid)
+        if (resetResult != null) {
+            displayManager.showComboBreakNotification(player, resetResult.previousCombo, resetResult.previousSpecies)
+            CobbleCatchCombo.LOGGER.debug(
+                "Combo reset for ${player.name.string} due to wild defeat: " +
                 "${resetResult.previousSpecies} x${resetResult.previousCombo}"
             )
         }

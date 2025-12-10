@@ -2,9 +2,6 @@ package com.pokemon.catchcombo.spawn
 
 import com.cobblemon.mod.common.api.spawning.spawner.PlayerSpawnerFactory
 import com.pokemon.catchcombo.CobbleCatchCombo
-import com.pokemon.catchcombo.config.CatchComboConfig
-import com.pokemon.catchcombo.service.BonusCalculator
-import com.pokemon.catchcombo.service.ComboManager
 
 /**
  * Registers the CatchComboSpawnInfluence with Cobblemon's spawning system.
@@ -17,6 +14,9 @@ import com.pokemon.catchcombo.service.ComboManager
  *
  * The influence builder is called for each player when a PlayerSpawner is created,
  * allowing us to create player-specific influences that check that player's combo status.
+ *
+ * NOTE: The CatchComboSpawnInfluence now fetches config/bonusCalculator at runtime
+ * from CobbleCatchCombo, so config reloads are automatically reflected.
  */
 object SpawnInfluenceRegistrar {
 
@@ -26,11 +26,7 @@ object SpawnInfluenceRegistrar {
      * Register the spawn influence builder with Cobblemon.
      * This should be called once during mod initialization.
      */
-    fun register(
-        config: CatchComboConfig,
-        comboManager: ComboManager,
-        bonusCalculator: BonusCalculator
-    ) {
+    fun register() {
         if (registered) {
             CobbleCatchCombo.LOGGER.warn("SpawnInfluenceRegistrar already registered!")
             return
@@ -40,14 +36,10 @@ object SpawnInfluenceRegistrar {
             // Register our influence builder with Cobblemon's PlayerSpawnerFactory
             // The lambda receives the player directly (not a spawner object)
             // Type: (ServerPlayer) -> SpawningInfluence?
+            // NOTE: CatchComboSpawnInfluence fetches config/managers from CobbleCatchCombo
+            // at runtime, so we don't need to pass them here.
             PlayerSpawnerFactory.influenceBuilders.add { player ->
-                // player is already a ServerPlayerEntity (ServerPlayer in Mojmap)
-                CatchComboSpawnInfluence(
-                    player = player,
-                    config = config,
-                    comboManager = comboManager,
-                    bonusCalculator = bonusCalculator
-                )
+                CatchComboSpawnInfluence(player)
             }
 
             registered = true

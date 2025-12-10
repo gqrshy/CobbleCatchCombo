@@ -28,13 +28,21 @@ import kotlin.random.Random
  * - Shiny is set via action.props.shiny (not pokemon.shiny)
  * - IVs are set via action.props.ivs using IVs.createRandomIVs()
  * - This ensures proper client sync and internal state consistency
+ *
+ * NOTE: This class fetches config/bonusCalculator from CobbleCatchCombo at runtime
+ * to ensure config reloads are properly reflected without re-registration.
  */
 class CatchComboSpawnInfluence(
-    private val player: ServerPlayerEntity,
-    private val config: CatchComboConfig,
-    private val comboManager: ComboManager,
-    private val bonusCalculator: BonusCalculator
+    private val player: ServerPlayerEntity
 ) : SpawningInfluence {
+
+    // Fetch current config/managers from CobbleCatchCombo to support config reload
+    private val config: CatchComboConfig
+        get() = CobbleCatchCombo.configManager.config
+    private val comboManager: ComboManager
+        get() = CobbleCatchCombo.comboManager
+    private val bonusCalculator: BonusCalculator
+        get() = CobbleCatchCombo.bonusCalculator
 
     companion object {
         private const val DEBUG = false

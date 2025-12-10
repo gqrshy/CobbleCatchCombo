@@ -28,7 +28,7 @@ src/main/kotlin/com/pokemon/catchcombo/
 ## 重要なAPI
 
 - **SpawningInfluence**: `PlayerSpawnerFactory.influenceBuilders`でスポーン前に補正
-- **イベント**: `CobblemonEvents.POKEMON_CAPTURED`, `BATTLE_FLED`
+- **イベント**: `CobblemonEvents.POKEMON_CAPTURED`, `BATTLE_FLED`, `BATTLE_VICTORY`
 - **種族ID**: `pokemon.species.resourceIdentifier.toString()` → `"cobblemon:pikachu"`
 
 ## コマンド
