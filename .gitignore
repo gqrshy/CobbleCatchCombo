@@ -2,6 +2,7 @@
 .gradle/
 build/
 out/
+gradle.properties.local
 
 # IDE
 .idea/
@@ -10,18 +11,70 @@ out/
 *.iws
 .vscode/
 *.code-workspace
+.project
+.classpath
+.settings/
+*.launch
 
-# Fabric
+# Fabric / Minecraft
 run/
 logs/
+*.log
+crash-reports/
+saves/
+screenshots/
 
 # OS
 .DS_Store
+.DS_Store?
+._*
 Thumbs.db
+ehthumbs.db
+Desktop.ini
 
 # Build outputs
 *.jar
 !gradle/wrapper/gradle-wrapper.jar
+*.zip
+*.tar.gz
 
 # Local config
 local.properties
+*.local
+
+# Documentation (auto-generated or not needed in repo)
+*.md
+docs/
+doc/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+\#*\#
+
+# Database files (runtime generated)
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Test outputs
+test-results/
+test-output/
+
+# Kotlin
+*.kotlin_module
+
+# Misc
+*.log.*
+.env
+.env.local
+secrets.json
+credentials.json
