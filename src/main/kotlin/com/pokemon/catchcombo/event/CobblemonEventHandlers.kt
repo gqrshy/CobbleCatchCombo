@@ -75,14 +75,17 @@ object CobblemonEventHandlers {
         }
 
         // Battle Fled Event (player fleeing from wild battle)
-        // NOTE: In Cobblemon 1.7.0, BattleFledEvent fires when reaching flee distance
-        // This might not be the right event for player-initiated fleeing
-        // If this causes issues, you may need to use a different approach
+        // BattleFledEvent.player is PlayerBattleActor, need to get entity from it
+        // event.player.entity returns ServerPlayer? (may be null if player disconnected)
         try {
             CobblemonEvents.BATTLE_FLED.subscribe(Priority.NORMAL) { event ->
                 try {
-                    // The event structure may vary - check if player property exists
-                    handleBattleFled(event.player)
+                    // Get the ServerPlayerEntity from PlayerBattleActor
+                    // PlayerBattleActor.entity returns the underlying player
+                    val player = event.player.entity
+                    if (player != null) {
+                        handleBattleFled(player)
+                    }
                 } catch (e: Exception) {
                     CobbleCatchCombo.LOGGER.debug("Error handling battle fled event: ${e.message}")
                 }

@@ -1,6 +1,7 @@
 package com.pokemon.catchcombo.spawn
 
 import com.cobblemon.mod.common.Cobblemon
+import com.cobblemon.mod.common.api.pokemon.PokemonSpecies
 import com.cobblemon.mod.common.api.spawning.detail.PokemonSpawnAction
 import com.cobblemon.mod.common.api.spawning.detail.SpawnAction
 import com.cobblemon.mod.common.api.spawning.influence.SpawningInfluence
@@ -10,6 +11,7 @@ import com.pokemon.catchcombo.config.CatchComboConfig
 import com.pokemon.catchcombo.service.BonusCalculator
 import com.pokemon.catchcombo.service.ComboManager
 import net.minecraft.server.network.ServerPlayerEntity
+import net.minecraft.util.Identifier
 import kotlin.random.Random
 
 /**
@@ -43,9 +45,13 @@ class CatchComboSpawnInfluence(
         if (action !is PokemonSpawnAction) return
 
         val speciesName = action.detail.pokemon.species ?: return
-        val speciesId = "cobblemon:$speciesName"
 
-        debug("Processing spawn: $speciesName for player ${player.name.string}")
+        // Get the proper species identifier from Cobblemon's species registry
+        // This ensures we match the same format used when capturing Pokemon
+        // (pokemon.species.resourceIdentifier.toString() returns "cobblemon:pikachu")
+        val speciesId = getSpeciesIdentifier(speciesName)
+
+        debug("Processing spawn: $speciesName -> $speciesId for player ${player.name.string}")
 
         // Get player's combo data
         val chainedSpecies = comboManager.getChainedSpecies(player.uuid)
@@ -165,6 +171,38 @@ class CatchComboSpawnInfluence(
     private fun debug(msg: String) {
         if (DEBUG) {
             println("[CatchCombo] $msg")
+        }
+    }
+
+    /**
+     * Get the species identifier in the same format used when capturing Pokemon.
+     *
+     * The spawn detail's pokemon.species is just the species name (e.g., "pikachu"),
+     * but when we capture a Pokemon, we store it using
+     * pokemon.species.resourceIdentifier.toString() which returns "cobblemon:pikachu".
+     *
+     * This method looks up the species in Cobblemon's registry to get the proper
+     * identifier, ensuring consistent matching between captures and spawns.
+     */
+    private fun getSpeciesIdentifier(speciesName: String): String {
+        return try {
+            // First, try to look up the species by name in Cobblemon's registry
+            val species = PokemonSpecies.getByName(speciesName)
+            if (species != null) {
+                species.resourceIdentifier.toString()
+            } else {
+                // If not found by name, try with cobblemon namespace
+                val identifier = Identifier.tryParse("cobblemon:$speciesName")
+                if (identifier != null) {
+                    val speciesByIdentifier = PokemonSpecies.getByIdentifier(identifier)
+                    speciesByIdentifier?.resourceIdentifier?.toString() ?: "cobblemon:$speciesName"
+                } else {
+                    "cobblemon:$speciesName"
+                }
+            }
+        } catch (e: Exception) {
+            // Fallback to simple concatenation if registry lookup fails
+            "cobblemon:$speciesName"
         }
     }
 }
