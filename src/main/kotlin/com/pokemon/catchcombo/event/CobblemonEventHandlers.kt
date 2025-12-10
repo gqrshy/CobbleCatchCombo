@@ -2,13 +2,11 @@ package com.pokemon.catchcombo.event
 
 import com.cobblemon.mod.common.api.Priority
 import com.cobblemon.mod.common.api.events.CobblemonEvents
-import com.cobblemon.mod.common.entity.pokemon.PokemonEntity
 import com.pokemon.catchcombo.CobbleCatchCombo
 import com.pokemon.catchcombo.config.CatchComboConfig
 import com.pokemon.catchcombo.display.DisplayManager
 import com.pokemon.catchcombo.lang.LanguageManager
 import com.pokemon.catchcombo.service.ComboManager
-import com.pokemon.catchcombo.service.SpawnModifier
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
 import net.minecraft.server.network.ServerPlayerEntity
@@ -16,47 +14,46 @@ import net.minecraft.server.network.ServerPlayerEntity
 /**
  * Cobblemon Event Handlers for CobbleCatchCombo
  *
+ * Handles:
+ * - Pokemon capture events (combo tracking)
+ * - Battle flee events (combo reset)
+ * - Player death events (combo reset)
+ * - Player disconnect events (display cleanup)
+ *
+ * NOTE: Spawn modification (shiny/IV boosts) is handled separately by
+ * CatchComboSpawnInfluence which uses Cobblemon's SpawningInfluence system.
+ * This is the correct approach as it modifies spawns BEFORE Pokemon creation.
+ *
  * IMPORTANT API NOTES (Cobblemon 1.7.x):
  * ======================================
- * This file uses Cobblemon's event system. If compilation fails, verify the following:
- *
  * 1. Event Names:
  *    - POKEMON_CAPTURED: Fires when a Pokemon is caught
- *    - POKEMON_ENTITY_SPAWN: Fires when a PokemonEntity spawns
  *    - BATTLE_FLED: Fires when player flees (check if this exists in 1.7.1)
  *
  * 2. Event Properties:
  *    - PokemonCapturedEvent: .player, .pokemon
- *    - PokemonEntitySpawnEvent: .entity (PokemonEntity)
  *    - BattleFledEvent: .player (verify this property exists)
  *
  * 3. Priority Enum:
  *    - Located at: com.cobblemon.mod.common.api.Priority
  *    - Values: LOWEST, LOW, NORMAL, HIGH, HIGHEST
  *
- * 4. Alternative Event Names (if above don't exist):
- *    - POKEMON_ENTITY_SPAWN might be POKEMON_ENTITY_SPAWNED or similar
- *    - Check CobblemonEvents object for available events
- *
  * Reference: https://gitlab.com/cable-mc/cobblemon
  */
 object CobblemonEventHandlers {
     private lateinit var comboManager: ComboManager
     private lateinit var displayManager: DisplayManager
-    private lateinit var spawnModifier: SpawnModifier
     private lateinit var config: CatchComboConfig
     private lateinit var languageManager: LanguageManager
 
     fun register(
         comboManager: ComboManager,
         displayManager: DisplayManager,
-        spawnModifier: SpawnModifier,
         config: CatchComboConfig,
         languageManager: LanguageManager
     ) {
         this.comboManager = comboManager
         this.displayManager = displayManager
-        this.spawnModifier = spawnModifier
         this.config = config
         this.languageManager = languageManager
 
@@ -94,15 +91,10 @@ object CobblemonEventHandlers {
             CobbleCatchCombo.LOGGER.warn("Could not register BATTLE_FLED event - player flee detection disabled")
         }
 
-        // Pokemon Entity Spawn Event - for applying IV/shiny boosts
-        // Using LOW priority so other mods can process first
-        CobblemonEvents.POKEMON_ENTITY_SPAWN.subscribe(Priority.LOW) { event ->
-            try {
-                handlePokemonSpawn(event.entity)
-            } catch (e: Exception) {
-                CobbleCatchCombo.LOGGER.error("Error handling Pokemon spawn event", e)
-            }
-        }
+        // NOTE: Spawn modification (shiny/IV boosts) is now handled by
+        // CatchComboSpawnInfluence using Cobblemon's SpawningInfluence system.
+        // This provides proper timing (before Pokemon creation) and uses
+        // the correct API methods (action.props.shiny, IVs.createRandomIVs).
     }
 
     private fun registerFabricEvents() {
@@ -180,13 +172,5 @@ object CobblemonEventHandlers {
                 "${resetResult.previousSpecies} x${resetResult.previousCombo}"
             )
         }
-    }
-
-    private fun handlePokemonSpawn(pokemonEntity: PokemonEntity) {
-        val pokemon = pokemonEntity.pokemon
-
-        // Apply spawn modifications (IV boost, shiny boost)
-        // This runs after Cobblemon's initial spawn setup
-        spawnModifier.modifySpawnedPokemon(pokemon, pokemonEntity)
     }
 }

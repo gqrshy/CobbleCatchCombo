@@ -9,7 +9,7 @@ import com.pokemon.catchcombo.integration.PlaceholderApiIntegration
 import com.pokemon.catchcombo.lang.LanguageManager
 import com.pokemon.catchcombo.service.BonusCalculator
 import com.pokemon.catchcombo.service.ComboManager
-import com.pokemon.catchcombo.service.SpawnModifier
+import com.pokemon.catchcombo.spawn.SpawnInfluenceRegistrar
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
@@ -31,8 +31,6 @@ object CobbleCatchCombo : ModInitializer {
     lateinit var bonusCalculator: BonusCalculator
         private set
     lateinit var displayManager: DisplayManager
-        private set
-    lateinit var spawnModifier: SpawnModifier
         private set
 
     private var placeholderIntegration: PlaceholderApiIntegration? = null
@@ -69,8 +67,10 @@ object CobbleCatchCombo : ModInitializer {
         // Initialize display manager
         displayManager = DisplayManager(configManager.config, languageManager, bonusCalculator)
 
-        // Initialize spawn modifier
-        spawnModifier = SpawnModifier(configManager.config, comboManager, bonusCalculator)
+        // Register spawn influence with Cobblemon's spawning system
+        // This is the correct approach for modifying spawns BEFORE Pokemon creation
+        // Reference: Cobblemon Unchained implementation
+        SpawnInfluenceRegistrar.register(configManager.config, comboManager, bonusCalculator)
 
         // Register server lifecycle events
         ServerLifecycleEvents.SERVER_STARTING.register { server ->
@@ -96,8 +96,8 @@ object CobbleCatchCombo : ModInitializer {
             CatchComboCommands.register(dispatcher)
         }
 
-        // Register Cobblemon event handlers
-        CobblemonEventHandlers.register(comboManager, displayManager, spawnModifier, configManager.config, languageManager)
+        // Register Cobblemon event handlers (capture, flee, death - NOT spawn modification)
+        CobblemonEventHandlers.register(comboManager, displayManager, configManager.config, languageManager)
 
         // Initialize Text Placeholder API integration if available
         if (FabricLoader.getInstance().isModLoaded("placeholder-api")) {
