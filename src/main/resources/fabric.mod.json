@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "id": "cobblecatchcombo",
+  "version": "${version}",
+  "name": "CobbleCatchCombo",
+  "description": "A Catch Combo system for Cobblemon inspired by Pokemon Let's Go. Catching the same Pokemon species repeatedly increases shiny rates and guarantees perfect IVs.",
+  "authors": [
+    "CobbleCatchCombo Team"
+  ],
+  "contact": {
+    "homepage": "https://github.com/cobblecatchcombo",
+    "sources": "https://github.com/cobblecatchcombo"
+  },
+  "license": "MIT",
+  "icon": "assets/cobblecatchcombo/icon.png",
+  "environment": "server",
+  "entrypoints": {
+    "main": [
+      {
+        "adapter": "kotlin",
+        "value": "com.pokemon.catchcombo.CobbleCatchCombo"
+      }
+    ]
+  },
+  "mixins": [],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-language-kotlin": ">=${fabric_kotlin_version}",
+    "minecraft": "~1.21.1",
+    "java": ">=21"
+  },
+  "recommends": {
+    "cobblemon": ">=1.7.0"
+  },
+  "custom": {
+    "modmenu": {
+      "links": {}
+    }
+  }
+}
