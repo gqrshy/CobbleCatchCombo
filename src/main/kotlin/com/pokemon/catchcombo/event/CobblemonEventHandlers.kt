@@ -4,10 +4,6 @@ import com.cobblemon.mod.common.api.Priority
 import com.cobblemon.mod.common.api.events.CobblemonEvents
 import com.cobblemon.mod.common.battles.actor.PlayerBattleActor
 import com.pokemon.catchcombo.CobbleCatchCombo
-import com.pokemon.catchcombo.config.CatchComboConfig
-import com.pokemon.catchcombo.display.DisplayManager
-import com.pokemon.catchcombo.lang.LanguageManager
-import com.pokemon.catchcombo.service.ComboManager
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
 import net.minecraft.server.network.ServerPlayerEntity
@@ -25,39 +21,19 @@ import net.minecraft.server.network.ServerPlayerEntity
  * CatchComboSpawnInfluence which uses Cobblemon's SpawningInfluence system.
  * This is the correct approach as it modifies spawns BEFORE Pokemon creation.
  *
- * IMPORTANT API NOTES (Cobblemon 1.7.x):
- * ======================================
- * 1. Event Names:
- *    - POKEMON_CAPTURED: Fires when a Pokemon is caught
- *    - BATTLE_FLED: Fires when player flees (check if this exists in 1.7.1)
- *
- * 2. Event Properties:
- *    - PokemonCapturedEvent: .player, .pokemon
- *    - BattleFledEvent: .player (verify this property exists)
- *
- * 3. Priority Enum:
- *    - Located at: com.cobblemon.mod.common.api.Priority
- *    - Values: LOWEST, LOW, NORMAL, HIGH, HIGHEST
+ * NOTE: This object fetches config from CobbleCatchCombo at runtime to ensure
+ * config reloads are properly reflected without re-registration.
  *
  * Reference: https://gitlab.com/cable-mc/cobblemon
  */
 object CobblemonEventHandlers {
-    private lateinit var comboManager: ComboManager
-    private lateinit var displayManager: DisplayManager
-    private lateinit var config: CatchComboConfig
-    private lateinit var languageManager: LanguageManager
+    // Fetch current config/managers from CobbleCatchCombo to support config reload
+    private val config get() = CobbleCatchCombo.configManager.config
+    private val comboManager get() = CobbleCatchCombo.comboManager
+    private val displayManager get() = CobbleCatchCombo.displayManager
+    private val languageManager get() = CobbleCatchCombo.languageManager
 
-    fun register(
-        comboManager: ComboManager,
-        displayManager: DisplayManager,
-        config: CatchComboConfig,
-        languageManager: LanguageManager
-    ) {
-        this.comboManager = comboManager
-        this.displayManager = displayManager
-        this.config = config
-        this.languageManager = languageManager
-
+    fun register() {
         registerCobblemonEvents()
         registerFabricEvents()
 

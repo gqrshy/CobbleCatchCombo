@@ -99,7 +99,11 @@ class BonusCalculator(private val config: CatchComboConfig) {
         return baseRate * multiplier
     }
 
-    fun formatShinyRate(multiplier: Double, baseRate: Double = 1.0 / 4096.0): String {
+    /**
+     * Format shiny rate as a human-readable string (e.g., "1/4096").
+     * Note: Cobblemon's default shiny rate is 1/8192 (baseRate = 1.0/8192.0)
+     */
+    fun formatShinyRate(multiplier: Double, baseRate: Double = 1.0 / 8192.0): String {
         val boostedRate = baseRate * multiplier
         val denominator = (1.0 / boostedRate).toInt()
         return "1/$denominator"

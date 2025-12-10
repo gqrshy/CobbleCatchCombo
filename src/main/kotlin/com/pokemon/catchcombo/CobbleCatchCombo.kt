@@ -65,7 +65,8 @@ object CobbleCatchCombo : ModInitializer {
         comboManager = ComboManager(bonusCalculator)
 
         // Initialize display manager
-        displayManager = DisplayManager(configManager.config, languageManager, bonusCalculator)
+        // NOTE: DisplayManager fetches config/managers from CobbleCatchCombo at runtime
+        displayManager = DisplayManager()
 
         // Register spawn influence with Cobblemon's spawning system
         // This is the correct approach for modifying spawns BEFORE Pokemon creation
@@ -98,7 +99,8 @@ object CobbleCatchCombo : ModInitializer {
         }
 
         // Register Cobblemon event handlers (capture, flee, death - NOT spawn modification)
-        CobblemonEventHandlers.register(comboManager, displayManager, configManager.config, languageManager)
+        // NOTE: EventHandlers fetch config/managers from CobbleCatchCombo at runtime
+        CobblemonEventHandlers.register()
 
         // Initialize Text Placeholder API integration if available
         if (FabricLoader.getInstance().isModLoaded("placeholder-api")) {

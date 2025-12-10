@@ -1,8 +1,7 @@
 package com.pokemon.catchcombo.display
 
 import com.cobblemon.mod.common.api.pokemon.PokemonSpecies
-import com.pokemon.catchcombo.config.CatchComboConfig
-import com.pokemon.catchcombo.lang.LanguageManager
+import com.pokemon.catchcombo.CobbleCatchCombo
 import com.pokemon.catchcombo.service.BonusCalculator
 import com.pokemon.catchcombo.service.ComboManager
 import net.minecraft.entity.boss.BossBar
@@ -14,11 +13,18 @@ import net.minecraft.util.Identifier
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
-class DisplayManager(
-    private val config: CatchComboConfig,
-    private val languageManager: LanguageManager,
-    private val bonusCalculator: BonusCalculator
-) {
+/**
+ * Manages display of catch combo information via BossBar and ActionBar.
+ *
+ * NOTE: This class fetches config/bonusCalculator from CobbleCatchCombo at runtime
+ * to ensure config reloads are properly reflected.
+ */
+class DisplayManager {
+    // Fetch current config/managers from CobbleCatchCombo to support config reload
+    private val config get() = CobbleCatchCombo.configManager.config
+    private val languageManager get() = CobbleCatchCombo.languageManager
+    private val bonusCalculator get() = CobbleCatchCombo.bonusCalculator
+
     private val playerBossBars = ConcurrentHashMap<UUID, ServerBossBar>()
     private val hideScheduledTicks = ConcurrentHashMap<UUID, Long>()
 
@@ -165,8 +171,8 @@ class DisplayManager(
     }
 
     private fun getPreviousMilestone(combo: Int): Int {
-        val shinyTiers = CobbleCatchCombo.configManager.config.shinyBoost.tiers
-        val ivTiers = CobbleCatchCombo.configManager.config.ivBoost.tiers
+        val shinyTiers = config.shinyBoost.tiers
+        val ivTiers = config.ivBoost.tiers
 
         val allMilestones = (shinyTiers.map { it.minCombo } + ivTiers.map { it.minCombo })
             .distinct()
@@ -276,14 +282,5 @@ class DisplayManager(
         playerBossBars.clear()
         hideScheduledTicks.clear()
         server = null
-    }
-
-    companion object {
-        private lateinit var instance: DisplayManager
-
-        // For reference in other classes
-        object CobbleCatchCombo {
-            val configManager get() = com.pokemon.catchcombo.CobbleCatchCombo.configManager
-        }
     }
 }
