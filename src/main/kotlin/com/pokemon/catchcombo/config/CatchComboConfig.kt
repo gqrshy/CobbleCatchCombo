@@ -47,7 +47,7 @@ data class MongodbConfig(
 data class ComboConfig(
     val resetOnPlayerFlee: Boolean = true,
     val resetOnPlayerDeath: Boolean = false,
-    val resetOnWildDefeat: Boolean = true,
+    val resetOnWildDefeat: Boolean = false,
     val treatEvolutionLineAsSameSpecies: Boolean = false
 )
 
