@@ -48,6 +48,16 @@ class CatchComboSpawnInfluence(
         private const val DEBUG = false
     }
 
+    /**
+     * Check if this influence should be removed.
+     * Returns true if the player has disconnected or is no longer valid.
+     *
+     * This is called by Cobblemon's spawning system to clean up expired influences.
+     */
+    override fun isExpired(): Boolean {
+        return player.isRemoved || player.isDisconnected
+    }
+
     override fun affectAction(action: SpawnAction<*>) {
         // Only handle Pokemon spawns
         if (action !is PokemonSpawnAction) return

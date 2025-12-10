@@ -62,7 +62,8 @@ object CobbleCatchCombo : ModInitializer {
         bonusCalculator = BonusCalculator(configManager.config)
 
         // Initialize combo manager (will be fully initialized on server start)
-        comboManager = ComboManager(bonusCalculator)
+        // NOTE: ComboManager fetches bonusCalculator from CobbleCatchCombo at runtime
+        comboManager = ComboManager()
 
         // Initialize display manager
         // NOTE: DisplayManager fetches config/managers from CobbleCatchCombo at runtime
@@ -103,8 +104,9 @@ object CobbleCatchCombo : ModInitializer {
         CobblemonEventHandlers.register()
 
         // Initialize Text Placeholder API integration if available
+        // NOTE: PlaceholderApiIntegration fetches managers from CobbleCatchCombo at runtime
         if (FabricLoader.getInstance().isModLoaded("placeholder-api")) {
-            placeholderIntegration = PlaceholderApiIntegration(comboManager, bonusCalculator, languageManager)
+            placeholderIntegration = PlaceholderApiIntegration()
             placeholderIntegration?.register()
             LOGGER.info("Text Placeholder API integration enabled")
         }

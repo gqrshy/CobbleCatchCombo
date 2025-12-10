@@ -12,11 +12,21 @@ import eu.pb4.placeholders.api.Placeholders
 import net.minecraft.text.Text
 import net.minecraft.util.Identifier
 
-class PlaceholderApiIntegration(
-    private val comboManager: ComboManager,
-    private val bonusCalculator: BonusCalculator,
+/**
+ * Integration with Text Placeholder API for displaying combo information.
+ *
+ * NOTE: This class fetches managers from CobbleCatchCombo at runtime
+ * to ensure config reloads are properly reflected.
+ */
+class PlaceholderApiIntegration {
+    // Fetch current managers from CobbleCatchCombo to support config reload
+    private val comboManager: ComboManager
+        get() = CobbleCatchCombo.comboManager
+    private val bonusCalculator: BonusCalculator
+        get() = CobbleCatchCombo.bonusCalculator
     private val languageManager: LanguageManager
-) {
+        get() = CobbleCatchCombo.languageManager
+
     /**
      * Get the base shiny rate from Cobblemon's config.
      * Default is 8192 (1/8192 chance).
