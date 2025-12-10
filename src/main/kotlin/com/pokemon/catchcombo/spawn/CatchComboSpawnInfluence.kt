@@ -95,8 +95,9 @@ class CatchComboSpawnInfluence(
      *
      * Math explanation:
      * - Cobblemon's base shiny rate comes from Cobblemon.config.shinyRate (default: 8192)
-     * - For a 2x multiplier, we want 2 chances out of shinyRate
-     * - We roll a random number and check if it's less than our boosted chances
+     * - Base chance = 1 / shinyRate (e.g., 1/8192)
+     * - Boosted chance = multiplier / shinyRate (e.g., 2/8192 for 2x)
+     * - We use floating point to preserve fractional multipliers (1.5x, 2.5x, etc.)
      *
      * This approach is correct because:
      * 1. We set props.shiny BEFORE the Pokemon is created
@@ -112,28 +113,29 @@ class CatchComboSpawnInfluence(
 
         // Get Cobblemon's shiny rate (default is 8192)
         val shinyRate = try {
-            Cobblemon.config.shinyRate.toInt()
+            Cobblemon.config.shinyRate.toDouble()
         } catch (e: Exception) {
-            8192 // Fallback to default
+            8192.0 // Fallback to default
         }
 
-        // Calculate boosted chances
-        // For multiplier=2.0, we get 2 chances out of shinyRate
-        val shinyChances = multiplier.toInt().coerceAtLeast(1)
+        // Calculate boosted probability
+        // For multiplier=2.0, we get 2/8192 chance
+        // For multiplier=1.5, we get 1.5/8192 chance
+        val boostedProbability = multiplier / shinyRate
 
-        // Roll for shiny
-        val roll = Random.nextInt(shinyRate)
-        val isShiny = roll < shinyChances
+        // Roll for shiny using floating point comparison
+        val roll = Random.nextDouble()
+        val isShiny = roll < boostedProbability
 
         if (isShiny) {
             action.props.shiny = true
-            debug("SHINY! Roll: $roll < $shinyChances (rate: $shinyRate)")
+            debug("SHINY! Roll: ${String.format("%.6f", roll)} < ${String.format("%.6f", boostedProbability)}")
             CobbleCatchCombo.LOGGER.debug(
                 "Catch combo made spawn shiny! Player: ${player.name.string}, " +
-                "Multiplier: ${multiplier}x, Roll: $roll/$shinyRate"
+                "Multiplier: ${multiplier}x, Probability: ${String.format("%.4f", boostedProbability * 100)}%"
             )
         } else {
-            debug("Not shiny. Roll: $roll >= $shinyChances (rate: $shinyRate)")
+            debug("Not shiny. Roll: ${String.format("%.6f", roll)} >= ${String.format("%.6f", boostedProbability)}")
         }
     }
 
