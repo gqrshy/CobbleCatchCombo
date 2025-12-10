@@ -1,5 +1,6 @@
 package com.pokemon.catchcombo.integration
 
+import com.cobblemon.mod.common.api.pokemon.PokemonSpecies
 import com.pokemon.catchcombo.CobbleCatchCombo
 import com.pokemon.catchcombo.lang.LanguageManager
 import com.pokemon.catchcombo.service.BonusCalculator
@@ -113,9 +114,32 @@ class PlaceholderApiIntegration(
         }
     }
 
+    /**
+     * Format species name using Cobblemon's translated name if available.
+     * Falls back to formatted string manipulation if translation not found.
+     */
     private fun formatSpeciesName(speciesId: String): String {
+        return try {
+            val identifier = Identifier.tryParse(speciesId)
+            if (identifier != null) {
+                val species = PokemonSpecies.getByIdentifier(identifier)
+                species?.translatedName?.string ?: fallbackFormatName(speciesId)
+            } else {
+                fallbackFormatName(speciesId)
+            }
+        } catch (e: Exception) {
+            fallbackFormatName(speciesId)
+        }
+    }
+
+    /**
+     * Fallback formatting: Convert "cobblemon:galarian_ponyta" to "Galarian Ponyta"
+     */
+    private fun fallbackFormatName(speciesId: String): String {
         val name = speciesId.substringAfter(":")
-        return name.replaceFirstChar { it.uppercase() }
+        return name.split("_").joinToString(" ") { word ->
+            word.replaceFirstChar { it.uppercase() }
+        }
     }
 
     private fun calculateCurrentTier(comboCount: Int): Int {

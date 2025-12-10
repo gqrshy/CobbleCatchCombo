@@ -98,16 +98,48 @@ class SpawnModifier(
         )
     }
 
+    /**
+     * Apply shiny boost by adding additional shiny chance.
+     *
+     * Math explanation:
+     * - Cobblemon already rolled shiny at base rate (1/4096)
+     * - For a 2x multiplier, we want total chance = 2/4096
+     * - Cobblemon gave us 1/4096, so we add (multiplier - 1) * base_rate
+     * - This avoids double-rolling which would give incorrect multiplier values
+     *
+     * Example: multiplier=2.0
+     * - Base rate: 1/4096 ≈ 0.0244%
+     * - Additional: (2-1) * 1/4096 = 1/4096 ≈ 0.0244%
+     * - Total effective: ~0.0488% = 2/4096 (correct 2x)
+     */
     private fun applyShinyBoost(pokemon: Pokemon, multiplier: Double) {
-        if (pokemon.shiny) return // Already shiny
+        if (pokemon.shiny) return // Already shiny from Cobblemon's base roll
 
-        val boostedRate = BASE_SHINY_RATE * multiplier
-        if (Random.nextDouble() < boostedRate) {
+        // Only apply additional chance beyond the base rate
+        // For multiplier=1.0, additionalChance=0 (no extra roll)
+        // For multiplier=2.0, additionalChance=1/4096 (one extra base rate)
+        val additionalChance = (multiplier - 1.0) * BASE_SHINY_RATE
+        if (additionalChance > 0 && Random.nextDouble() < additionalChance) {
             pokemon.shiny = true
-            CobbleCatchCombo.LOGGER.debug("Combo bonus made ${pokemon.species.name} shiny!")
+            CobbleCatchCombo.LOGGER.debug("Combo bonus made ${pokemon.species.name} shiny! (additional chance: ${String.format("%.4f", additionalChance * 100)}%)")
         }
     }
 
+    /**
+     * Apply guaranteed perfect IVs to a Pokemon.
+     *
+     * Cobblemon API Note:
+     * - Pokemon.ivs returns an IVs object that implements operator set ([stat] = value)
+     * - Setting ivs[stat] = 31 directly modifies the Pokemon's IV values
+     * - This is done after spawn so we're modifying the already-rolled IVs
+     *
+     * Algorithm:
+     * 1. Find all stats that are not already 31 (perfect)
+     * 2. Randomly select N of these stats (where N = guaranteedPerfectIVs)
+     * 3. Set each selected stat to 31
+     *
+     * This ensures we don't waste boosts on already-perfect IVs.
+     */
     private fun applyIvBoost(pokemon: Pokemon, guaranteedPerfectIVs: Int) {
         if (guaranteedPerfectIVs <= 0) return
 

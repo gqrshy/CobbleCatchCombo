@@ -4,37 +4,31 @@ import com.pokemon.catchcombo.CobbleCatchCombo
 import com.pokemon.catchcombo.data.ComboData
 import com.pokemon.catchcombo.data.ComboRepository
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 
+/**
+ * Manages player catch combo data.
+ *
+ * Note: This class delegates caching to the repository layer (SQLiteRepository)
+ * to avoid duplicate caching and potential synchronization issues.
+ */
 class ComboManager(private val bonusCalculator: BonusCalculator) {
     private var repository: ComboRepository? = null
-    private val comboCache = ConcurrentHashMap<UUID, ComboData>()
 
     fun initialize(repository: ComboRepository) {
         this.repository = repository
         repository.initialize()
 
-        // Load all existing data into cache
-        repository.getAllComboData().forEach { data ->
-            comboCache[data.playerUuid] = data
-        }
-
-        CobbleCatchCombo.LOGGER.info("ComboManager initialized with ${comboCache.size} cached entries")
+        val entryCount = repository.getAllComboData().size
+        CobbleCatchCombo.LOGGER.info("ComboManager initialized with $entryCount entries from repository")
     }
 
     fun shutdown() {
-        // Save all cached data
-        comboCache.values.forEach { data ->
-            repository?.saveComboData(data)
-        }
         repository?.shutdown()
         CobbleCatchCombo.LOGGER.info("ComboManager shutdown complete")
     }
 
     fun getComboData(playerUuid: UUID): ComboData {
-        return comboCache.getOrPut(playerUuid) {
-            repository?.getComboData(playerUuid) ?: ComboData.empty(playerUuid)
-        }
+        return repository?.getComboData(playerUuid) ?: ComboData.empty(playerUuid)
     }
 
     fun getComboCount(playerUuid: UUID): Int {
