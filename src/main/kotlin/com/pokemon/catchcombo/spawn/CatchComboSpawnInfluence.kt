@@ -110,8 +110,12 @@ class CatchComboSpawnInfluence(
             true // Apply to all Pokemon when player has a combo
         }
 
-        // IV boost always requires chained species
-        val shouldApplyIvBoost = isChainedSpecies
+        // For IV boost: check config if it applies to all or only chained species
+        val shouldApplyIvBoost = if (config.ivBoost.onlyChainedSpecies) {
+            isChainedSpecies
+        } else {
+            true // Apply to all Pokemon when player has a combo
+        }
 
         if (!shouldApplyShinyBoost && !shouldApplyIvBoost) {
             debug("No bonuses apply for $speciesName (chained: $chainedSpecies)")

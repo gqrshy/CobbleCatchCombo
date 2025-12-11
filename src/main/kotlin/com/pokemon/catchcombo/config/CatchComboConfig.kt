@@ -76,6 +76,7 @@ data class ShinyTier(
 @Serializable
 data class IvBoostConfig(
     val enabled: Boolean = true,
+    val onlyChainedSpecies: Boolean = true,
     val tiers: List<IvTier> = listOf(
         IvTier(0, 0),
         IvTier(10, 1),
