@@ -1,8 +1,10 @@
 package com.pokemon.catchcombo.service
 
 import com.pokemon.catchcombo.CobbleCatchCombo
+import com.pokemon.catchcombo.config.CatchComboConfig
 import com.pokemon.catchcombo.data.ComboData
 import com.pokemon.catchcombo.data.ComboRepository
+import com.pokemon.catchcombo.util.SpeciesUtils
 import java.util.UUID
 
 /**
@@ -20,7 +22,9 @@ import java.util.UUID
 class ComboManager {
     private var repository: ComboRepository? = null
 
-    // Fetch bonusCalculator dynamically to support config reload
+    // Fetch config and bonusCalculator dynamically to support config reload
+    private val config: CatchComboConfig
+        get() = CobbleCatchCombo.configManager.config
     private val bonusCalculator: BonusCalculator
         get() = CobbleCatchCombo.bonusCalculator
 
@@ -66,7 +70,19 @@ class ComboManager {
         val oldCombo = data.comboCount
         val oldSpecies = data.chainedSpecies
 
-        val chainBroken = oldSpecies != null && oldSpecies != speciesId && oldCombo > 0
+        // Check if chain continues based on config
+        val chainContinues = if (oldSpecies == null || oldCombo <= 0) {
+            // No existing chain, so starting fresh
+            true
+        } else if (config.combo.treatEvolutionLineAsSameSpecies) {
+            // Compare using evolution line - e.g., Pikachu continues a Pichu chain
+            SpeciesUtils.areInSameEvolutionLine(oldSpecies, speciesId)
+        } else {
+            // Exact species match required
+            oldSpecies == speciesId
+        }
+
+        val chainBroken = oldSpecies != null && !chainContinues && oldCombo > 0
         val wasNewChain = data.incrementCombo(speciesId)
 
         // Save to database

@@ -27,6 +27,27 @@ class DisplayManager(
     // World ticks can be affected by /time commands or dimension changes
     private val hideScheduledTime = ConcurrentHashMap<UUID, Long>()
 
+    // ActionBar tracking for duration-based display
+    // Minecraft's ActionBar auto-fades after ~2 seconds, so we re-send it periodically
+    private val activeActionBars = ConcurrentHashMap<UUID, ActionBarState>()
+
+    /**
+     * Tracks state for an active ActionBar display.
+     * @param message The text to display
+     * @param endTime When to stop showing (System.currentTimeMillis())
+     * @param nextSendTime When to re-send the ActionBar to prevent fade
+     */
+    private data class ActionBarState(
+        val message: String,
+        val endTime: Long,
+        var nextSendTime: Long
+    )
+
+    companion object {
+        // Re-send interval in milliseconds (ActionBar fades after ~2 sec)
+        private const val ACTION_BAR_RESEND_INTERVAL = 1500L
+    }
+
     // Server reference for main thread execution
     private var server: MinecraftServer? = null
 
@@ -97,25 +118,48 @@ class DisplayManager(
     }
 
     /**
-     * Called every server tick to handle boss bar hiding.
-     * This ensures boss bar operations happen on the main thread.
+     * Called every server tick to handle boss bar hiding and ActionBar re-sends.
+     * This ensures display operations happen on the main thread.
      */
     fun tick() {
-        // Skip if no scheduled hides
-        if (hideScheduledTime.isEmpty()) return
-
         val currentTime = System.currentTimeMillis()
-        val toRemove = mutableListOf<UUID>()
 
-        hideScheduledTime.forEach { (uuid, hideTime) ->
-            if (currentTime >= hideTime) {
-                toRemove.add(uuid)
+        // Handle boss bar hiding
+        if (hideScheduledTime.isNotEmpty()) {
+            val toRemove = mutableListOf<UUID>()
+
+            hideScheduledTime.forEach { (uuid, hideTime) ->
+                if (currentTime >= hideTime) {
+                    toRemove.add(uuid)
+                }
+            }
+
+            toRemove.forEach { uuid ->
+                hideScheduledTime.remove(uuid)
+                hideBossBar(uuid)
             }
         }
 
-        toRemove.forEach { uuid ->
-            hideScheduledTime.remove(uuid)
-            hideBossBar(uuid)
+        // Handle ActionBar re-sends for duration-based display
+        if (activeActionBars.isNotEmpty()) {
+            val toRemove = mutableListOf<UUID>()
+
+            activeActionBars.forEach { (uuid, state) ->
+                if (currentTime >= state.endTime) {
+                    // Duration expired, remove from tracking
+                    toRemove.add(uuid)
+                } else if (currentTime >= state.nextSendTime) {
+                    // Time to re-send to prevent fade
+                    server?.playerManager?.getPlayer(uuid)?.let { player ->
+                        player.sendMessage(Text.literal(state.message), true)
+                    }
+                    state.nextSendTime = currentTime + ACTION_BAR_RESEND_INTERVAL
+                }
+            }
+
+            toRemove.forEach { uuid ->
+                activeActionBars.remove(uuid)
+            }
         }
     }
 
@@ -131,7 +175,20 @@ class DisplayManager(
         }
 
         val displayText = languageManager.translate(textKey, locale, placeholders)
+
+        // Send immediately
         player.sendMessage(Text.literal(displayText), true)
+
+        // Schedule repeated sends for the configured duration
+        val durationMillis = config.display.actionBar.showDurationSeconds * 1000L
+        if (durationMillis > 0) {
+            val currentTime = System.currentTimeMillis()
+            activeActionBars[player.uuid] = ActionBarState(
+                message = displayText,
+                endTime = currentTime + durationMillis,
+                nextSendTime = currentTime + ACTION_BAR_RESEND_INTERVAL
+            )
+        }
     }
 
     private fun buildPlaceholders(result: ComboManager.CaptureResult, speciesName: String, locale: String): Map<String, String> {
@@ -247,6 +304,7 @@ class DisplayManager(
 
     fun removePlayer(playerUuid: UUID) {
         hideScheduledTime.remove(playerUuid)
+        activeActionBars.remove(playerUuid)
         hideBossBar(playerUuid)
     }
 
@@ -270,6 +328,7 @@ class DisplayManager(
         playerBossBars.values.forEach { it.clearPlayers() }
         playerBossBars.clear()
         hideScheduledTime.clear()
+        activeActionBars.clear()
         server = null
     }
 }

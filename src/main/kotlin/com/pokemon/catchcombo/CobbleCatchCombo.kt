@@ -11,6 +11,7 @@ import com.pokemon.catchcombo.service.BonusCalculator
 import com.pokemon.catchcombo.service.ComboManager
 import com.pokemon.catchcombo.spawn.CatchComboSpawnInfluence
 import com.pokemon.catchcombo.spawn.SpawnInfluenceRegistrar
+import com.pokemon.catchcombo.util.SpeciesUtils
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
@@ -160,8 +161,9 @@ object CobbleCatchCombo : ModInitializer {
 
         // Update bonus calculator with new config
         bonusCalculator = BonusCalculator(configManager.config)
-        // Clear spawn influence cache in case species registry changed
+        // Clear caches in case species registry changed
         CatchComboSpawnInfluence.clearCache()
+        SpeciesUtils.clearCache()
         LOGGER.info("Configuration reloaded")
     }
 }

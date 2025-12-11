@@ -10,6 +10,7 @@ import com.pokemon.catchcombo.CobbleCatchCombo
 import com.pokemon.catchcombo.config.CatchComboConfig
 import com.pokemon.catchcombo.service.BonusCalculator
 import com.pokemon.catchcombo.service.ComboManager
+import com.pokemon.catchcombo.util.SpeciesUtils
 import net.minecraft.server.network.ServerPlayerEntity
 import net.minecraft.util.Identifier
 import kotlin.random.Random
@@ -101,7 +102,13 @@ class CatchComboSpawnInfluence(
 
         // Determine if this species qualifies for bonuses
         // Note: Regional forms share the same base species ID, so they match
-        val isChainedSpecies = chainedSpecies == speciesId
+        val isChainedSpecies = if (config.combo.treatEvolutionLineAsSameSpecies) {
+            // Compare using evolution line - e.g., Pikachu spawn gets bonus from Pichu chain
+            SpeciesUtils.areInSameEvolutionLine(chainedSpecies, speciesId)
+        } else {
+            // Exact species match required
+            chainedSpecies == speciesId
+        }
 
         // For shiny boost: check config if it applies to all or only chained species
         val shouldApplyShinyBoost = if (config.shinyBoost.onlyChainedSpecies) {
