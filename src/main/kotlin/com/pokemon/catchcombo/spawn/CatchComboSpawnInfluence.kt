@@ -23,11 +23,13 @@ import kotlin.random.Random
  * Reference: Cobblemon Unchained implementation
  * https://github.com/timinc-cobble/cobblemon-unchained-1.5-fabric
  *
- * Key differences from POKEMON_ENTITY_SPAWN event approach:
+ * Key implementation notes:
  * - Properties are set on SpawnAction.props BEFORE Pokemon creation
  * - Shiny is set via action.props.shiny (not pokemon.shiny)
  * - IVs are set via action.props.ivs using IVs.createRandomIVs()
- * - This ensures proper client sync and internal state consistency
+ * - Species comparison uses resourceIdentifier for consistency with captures
+ * - Regional forms (Galarian, Alolan, etc.) are treated as the same base species
+ *   because pokemon.species.resourceIdentifier returns the base species ID
  *
  * NOTE: This class fetches config/bonusCalculator from CobbleCatchCombo at runtime
  * to ensure config reloads are properly reflected without re-registration.
@@ -46,18 +48,45 @@ class CatchComboSpawnInfluence(
 
     companion object {
         private const val DEBUG = false
+
+        // Cache for species identifier lookups to improve performance
+        // Key: species name (e.g., "pikachu"), Value: full identifier (e.g., "cobblemon:pikachu")
+        private val speciesIdCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+        /**
+         * Clear the species ID cache. Should be called on config reload
+         * in case species registry changes.
+         */
+        fun clearCache() {
+            speciesIdCache.clear()
+        }
     }
 
     override fun affectAction(action: SpawnAction<*>) {
         // Only handle Pokemon spawns
         if (action !is PokemonSpawnAction) return
 
-        val speciesName = action.detail.pokemon.species ?: return
+        // Get species from spawn detail - this is a string like "pikachu" or "ponyta"
+        val speciesName = action.detail.pokemon.species
+        if (speciesName.isNullOrBlank()) {
+            debug("Spawn has no species defined, skipping")
+            return
+        }
+
+        // Skip "random" spawns - these are dynamic and shouldn't have combo bonuses
+        if (speciesName.equals("random", ignoreCase = true)) {
+            debug("Random spawn detected, skipping")
+            return
+        }
 
         // Get the proper species identifier from Cobblemon's species registry
         // This ensures we match the same format used when capturing Pokemon
         // (pokemon.species.resourceIdentifier.toString() returns "cobblemon:pikachu")
         val speciesId = getSpeciesIdentifier(speciesName)
+        if (speciesId.isBlank()) {
+            debug("Could not resolve species identifier for: $speciesName")
+            return
+        }
 
         debug("Processing spawn: $speciesName -> $speciesId for player ${player.name.string}")
 
@@ -71,6 +100,7 @@ class CatchComboSpawnInfluence(
         }
 
         // Determine if this species qualifies for bonuses
+        // Note: Regional forms share the same base species ID, so they match
         val isChainedSpecies = chainedSpecies == speciesId
 
         // For shiny boost: check config if it applies to all or only chained species
@@ -195,24 +225,42 @@ class CatchComboSpawnInfluence(
      *
      * This method looks up the species in Cobblemon's registry to get the proper
      * identifier, ensuring consistent matching between captures and spawns.
+     *
+     * Results are cached to improve performance as spawn events are frequent.
      */
     private fun getSpeciesIdentifier(speciesName: String): String {
+        // Check cache first
+        speciesIdCache[speciesName]?.let { return it }
+
+        val identifier = resolveSpeciesIdentifier(speciesName)
+        speciesIdCache[speciesName] = identifier
+        return identifier
+    }
+
+    /**
+     * Resolve the species identifier from Cobblemon's registry.
+     */
+    private fun resolveSpeciesIdentifier(speciesName: String): String {
         return try {
             // First, try to look up the species by name in Cobblemon's registry
             val species = PokemonSpecies.getByName(speciesName)
             if (species != null) {
-                species.resourceIdentifier.toString()
-            } else {
-                // If not found by name, try with cobblemon namespace
-                val identifier = Identifier.tryParse("cobblemon:$speciesName")
-                if (identifier != null) {
-                    val speciesByIdentifier = PokemonSpecies.getByIdentifier(identifier)
-                    speciesByIdentifier?.resourceIdentifier?.toString() ?: "cobblemon:$speciesName"
-                } else {
-                    "cobblemon:$speciesName"
+                return species.resourceIdentifier.toString()
+            }
+
+            // If not found by name, try with cobblemon namespace
+            val identifier = Identifier.tryParse("cobblemon:$speciesName")
+            if (identifier != null) {
+                val speciesByIdentifier = PokemonSpecies.getByIdentifier(identifier)
+                if (speciesByIdentifier != null) {
+                    return speciesByIdentifier.resourceIdentifier.toString()
                 }
             }
+
+            // Fallback: assume cobblemon namespace
+            "cobblemon:$speciesName"
         } catch (e: Exception) {
+            CobbleCatchCombo.LOGGER.debug("Failed to resolve species identifier for '$speciesName': ${e.message}")
             // Fallback to simple concatenation if registry lookup fails
             "cobblemon:$speciesName"
         }

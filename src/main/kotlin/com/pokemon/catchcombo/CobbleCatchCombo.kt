@@ -9,6 +9,7 @@ import com.pokemon.catchcombo.integration.PlaceholderApiIntegration
 import com.pokemon.catchcombo.lang.LanguageManager
 import com.pokemon.catchcombo.service.BonusCalculator
 import com.pokemon.catchcombo.service.ComboManager
+import com.pokemon.catchcombo.spawn.CatchComboSpawnInfluence
 import com.pokemon.catchcombo.spawn.SpawnInfluenceRegistrar
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
@@ -121,6 +122,8 @@ object CobbleCatchCombo : ModInitializer {
         languageManager.loadLanguages()
         // Update bonus calculator with new config
         bonusCalculator = BonusCalculator(configManager.config)
+        // Clear spawn influence cache in case species registry changed
+        CatchComboSpawnInfluence.clearCache()
         LOGGER.info("Configuration reloaded")
     }
 }
