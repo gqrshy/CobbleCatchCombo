@@ -11,8 +11,12 @@ import java.util.UUID
  * Note: This class delegates caching to the repository layer (SQLiteRepository)
  * to avoid duplicate caching and potential synchronization issues.
  */
-class ComboManager(private val bonusCalculator: BonusCalculator) {
+class ComboManager {
     private var repository: ComboRepository? = null
+
+    // Fetch bonusCalculator dynamically to support config reload
+    private val bonusCalculator: BonusCalculator
+        get() = CobbleCatchCombo.bonusCalculator
 
     fun initialize(repository: ComboRepository) {
         this.repository = repository

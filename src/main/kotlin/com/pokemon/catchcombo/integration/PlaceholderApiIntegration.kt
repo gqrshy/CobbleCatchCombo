@@ -14,9 +14,11 @@ import net.minecraft.util.Identifier
 
 class PlaceholderApiIntegration(
     private val comboManager: ComboManager,
-    private val bonusCalculator: BonusCalculator,
     private val languageManager: LanguageManager
 ) {
+    // Fetch bonusCalculator dynamically to support config reload
+    private val bonusCalculator: BonusCalculator
+        get() = CobbleCatchCombo.bonusCalculator
     /**
      * Get the base shiny rate from Cobblemon's config.
      * Default is 8192 (1/8192 chance).

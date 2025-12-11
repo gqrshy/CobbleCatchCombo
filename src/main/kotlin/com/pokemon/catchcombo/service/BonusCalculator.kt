@@ -4,7 +4,19 @@ import com.pokemon.catchcombo.config.CatchComboConfig
 import com.pokemon.catchcombo.config.IvTier
 import com.pokemon.catchcombo.config.ShinyTier
 
+/**
+ * Calculates shiny and IV bonuses based on catch combo count.
+ *
+ * Thread-safe: This class is immutable after construction and safe for concurrent use.
+ */
 class BonusCalculator(private val config: CatchComboConfig) {
+
+    companion object {
+        // Maximum valid perfect IVs (HP, Atk, Def, SpA, SpD, Spe)
+        const val MAX_PERFECT_IVS = 6
+        // Minimum valid multiplier
+        const val MIN_MULTIPLIER = 1.0
+    }
 
     data class BonusResult(
         val shinyMultiplier: Double,
@@ -18,14 +30,25 @@ class BonusCalculator(private val config: CatchComboConfig) {
     }
 
     fun calculateBonus(comboCount: Int): BonusResult {
-        val shinyTier = getCurrentShinyTier(comboCount)
-        val ivTier = getCurrentIvTier(comboCount)
-        val nextShinyTier = getNextShinyTier(comboCount)
-        val nextIvTier = getNextIvTier(comboCount)
+        // Ensure comboCount is non-negative
+        val safeComboCount = comboCount.coerceAtLeast(0)
+
+        val shinyTier = getCurrentShinyTier(safeComboCount)
+        val ivTier = getCurrentIvTier(safeComboCount)
+        val nextShinyTier = getNextShinyTier(safeComboCount)
+        val nextIvTier = getNextIvTier(safeComboCount)
+
+        // Calculate multiplier with validation (minimum 1.0)
+        val rawMultiplier = if (config.shinyBoost.enabled) shinyTier?.multiplier ?: 1.0 else 1.0
+        val safeMultiplier = rawMultiplier.coerceAtLeast(MIN_MULTIPLIER)
+
+        // Calculate IVs with validation (0-6 range)
+        val rawIvs = if (config.ivBoost.enabled) ivTier?.guaranteedPerfectIVs ?: 0 else 0
+        val safeIvs = rawIvs.coerceIn(0, MAX_PERFECT_IVS)
 
         return BonusResult(
-            shinyMultiplier = if (config.shinyBoost.enabled) shinyTier?.multiplier ?: 1.0 else 1.0,
-            guaranteedPerfectIVs = if (config.ivBoost.enabled) ivTier?.guaranteedPerfectIVs ?: 0 else 0,
+            shinyMultiplier = safeMultiplier,
+            guaranteedPerfectIVs = safeIvs,
             currentShinyTier = shinyTier,
             currentIvTier = ivTier,
             nextShinyTier = nextShinyTier,
@@ -96,12 +119,29 @@ class BonusCalculator(private val config: CatchComboConfig) {
     }
 
     fun calculateShinyRate(baseRate: Double, multiplier: Double): Double {
-        return baseRate * multiplier
+        // Ensure multiplier is at least 1.0
+        val safeMultiplier = multiplier.coerceAtLeast(MIN_MULTIPLIER)
+        return baseRate * safeMultiplier
     }
 
+    /**
+     * Format the shiny rate as a human-readable string (e.g., "1/4096").
+     *
+     * @param multiplier The shiny multiplier (e.g., 2.0 for 2x rate)
+     * @param baseRate The base shiny rate as a decimal (default: 1/4096)
+     * @return Formatted string like "1/4096" or "1/2048"
+     */
     fun formatShinyRate(multiplier: Double, baseRate: Double = 1.0 / 4096.0): String {
-        val boostedRate = baseRate * multiplier
-        val denominator = (1.0 / boostedRate).toInt()
+        // Ensure multiplier is valid to prevent division by zero
+        val safeMultiplier = multiplier.coerceAtLeast(MIN_MULTIPLIER)
+        val boostedRate = baseRate * safeMultiplier
+
+        // Prevent division by zero
+        if (boostedRate <= 0.0) {
+            return "1/∞"
+        }
+
+        val denominator = (1.0 / boostedRate).toInt().coerceAtLeast(1)
         return "1/$denominator"
     }
 }

@@ -7,10 +7,23 @@ import java.sql.Connection
 import java.sql.DriverManager
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
+/**
+ * SQLite-based repository for combo data persistence.
+ *
+ * Thread safety:
+ * - Cache operations are thread-safe via ConcurrentHashMap
+ * - Database operations are synchronized via ReentrantLock to prevent concurrent SQLite access
+ * - ComboData objects are copied when retrieved to prevent concurrent modification
+ */
 class SQLiteRepository(private val dataDir: Path) : ComboRepository {
     private var connection: Connection? = null
     private val cache = ConcurrentHashMap<UUID, ComboData>()
+
+    // Lock for database operations - SQLite doesn't handle concurrent writes well
+    private val dbLock = ReentrantLock()
 
     override fun initialize() {
         try {
@@ -64,21 +77,40 @@ class SQLiteRepository(private val dataDir: Path) : ComboRepository {
     }
 
     override fun shutdown() {
-        // Save all cached data
-        cache.values.forEach { saveToDatabase(it) }
+        dbLock.withLock {
+            // Save all cached data
+            cache.values.forEach { saveToDatabase(it) }
 
-        connection?.close()
-        connection = null
+            connection?.close()
+            connection = null
+        }
         CobbleCatchCombo.LOGGER.info("SQLite database connection closed")
     }
 
+    /**
+     * Get combo data for a player.
+     * Returns a COPY of the cached data to prevent concurrent modification issues.
+     * If no data exists, returns null.
+     */
     override fun getComboData(playerUuid: UUID): ComboData? {
-        return cache[playerUuid]
+        return cache[playerUuid]?.copy()
+    }
+
+    /**
+     * Get combo data for a player, creating new empty data if none exists.
+     * This is the preferred method for getting modifiable data.
+     */
+    fun getOrCreateComboData(playerUuid: UUID): ComboData {
+        return cache.computeIfAbsent(playerUuid) { ComboData.empty(playerUuid) }.copy()
     }
 
     override fun saveComboData(data: ComboData) {
-        cache[data.playerUuid] = data
-        saveToDatabase(data)
+        // Store a copy in cache to prevent external modification
+        cache[data.playerUuid] = data.copy()
+        // Save to database with lock
+        dbLock.withLock {
+            saveToDatabase(data)
+        }
     }
 
     private fun saveToDatabase(data: ComboData) {
@@ -102,17 +134,20 @@ class SQLiteRepository(private val dataDir: Path) : ComboRepository {
 
     override fun deleteComboData(playerUuid: UUID) {
         cache.remove(playerUuid)
-        try {
-            connection?.prepareStatement("DELETE FROM combo_data WHERE player_uuid = ?")?.use { stmt ->
-                stmt.setString(1, playerUuid.toString())
-                stmt.executeUpdate()
+        dbLock.withLock {
+            try {
+                connection?.prepareStatement("DELETE FROM combo_data WHERE player_uuid = ?")?.use { stmt ->
+                    stmt.setString(1, playerUuid.toString())
+                    stmt.executeUpdate()
+                }
+            } catch (e: Exception) {
+                CobbleCatchCombo.LOGGER.error("Failed to delete combo data for $playerUuid", e)
             }
-        } catch (e: Exception) {
-            CobbleCatchCombo.LOGGER.error("Failed to delete combo data for $playerUuid", e)
         }
     }
 
     override fun getAllComboData(): List<ComboData> {
-        return cache.values.toList()
+        // Return copies to prevent external modification
+        return cache.values.map { it.copy() }
     }
 }
