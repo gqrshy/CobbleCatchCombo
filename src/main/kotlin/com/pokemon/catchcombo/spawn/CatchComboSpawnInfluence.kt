@@ -239,17 +239,39 @@ class CatchComboSpawnInfluence(
 
     /**
      * Resolve the species identifier from Cobblemon's registry.
+     *
+     * The spawn detail's pokemon.species can be:
+     * - Just the name: "pikachu"
+     * - With namespace: "cobblemon:pikachu"
+     *
+     * We need to handle both cases and return a consistent format.
      */
     private fun resolveSpeciesIdentifier(speciesName: String): String {
         return try {
-            // First, try to look up the species by name in Cobblemon's registry
-            val species = PokemonSpecies.getByName(speciesName)
+            // Check if speciesName already has a namespace (contains ':')
+            val normalizedName = if (speciesName.contains(':')) {
+                // Already has namespace, try to parse as identifier directly
+                val identifier = Identifier.tryParse(speciesName)
+                if (identifier != null) {
+                    val species = PokemonSpecies.getByIdentifier(identifier)
+                    if (species != null) {
+                        return species.resourceIdentifier.toString()
+                    }
+                }
+                // If lookup failed, extract the path part for further processing
+                speciesName.substringAfter(':')
+            } else {
+                speciesName
+            }
+
+            // Try to look up the species by name in Cobblemon's registry
+            val species = PokemonSpecies.getByName(normalizedName)
             if (species != null) {
                 return species.resourceIdentifier.toString()
             }
 
             // If not found by name, try with cobblemon namespace
-            val identifier = Identifier.tryParse("cobblemon:$speciesName")
+            val identifier = Identifier.tryParse("cobblemon:$normalizedName")
             if (identifier != null) {
                 val speciesByIdentifier = PokemonSpecies.getByIdentifier(identifier)
                 if (speciesByIdentifier != null) {
@@ -257,12 +279,12 @@ class CatchComboSpawnInfluence(
                 }
             }
 
-            // Fallback: assume cobblemon namespace
-            "cobblemon:$speciesName"
+            // Fallback: assume cobblemon namespace with the normalized name
+            "cobblemon:$normalizedName"
         } catch (e: Exception) {
             CobbleCatchCombo.LOGGER.debug("Failed to resolve species identifier for '$speciesName': ${e.message}")
-            // Fallback to simple concatenation if registry lookup fails
-            "cobblemon:$speciesName"
+            // Fallback: if it has namespace, use it; otherwise add cobblemon namespace
+            if (speciesName.contains(':')) speciesName else "cobblemon:$speciesName"
         }
     }
 }

@@ -55,6 +55,9 @@ object CobbleCatchCombo : ModInitializer {
         configManager = ConfigManager()
         configManager.loadConfig()
 
+        // Save initial database type for reload warnings
+        saveInitialDbType()
+
         // Initialize language manager
         languageManager = LanguageManager()
         languageManager.loadLanguages()
@@ -129,13 +132,21 @@ object CobbleCatchCombo : ModInitializer {
     fun isCobblemonLoaded(): Boolean = cobblemonLoaded
 
     // Track initial database config for reload warnings
+    // This is set in onInitialize after first config load
     private var initialDbType: String? = null
 
+    /**
+     * Save the initial database type after first config load.
+     * Must be called from onInitialize after configManager.loadConfig().
+     */
+    private fun saveInitialDbType() {
+        initialDbType = configManager.config.database.type
+    }
+
     fun reloadConfig() {
-        // Store initial db type on first reload (or compare on subsequent reloads)
-        val currentDbType = configManager.config.database.type
+        // Ensure initial db type is saved (for backward compatibility if called before onInitialize completes)
         if (initialDbType == null) {
-            initialDbType = currentDbType
+            saveInitialDbType()
         }
 
         configManager.reloadConfig()

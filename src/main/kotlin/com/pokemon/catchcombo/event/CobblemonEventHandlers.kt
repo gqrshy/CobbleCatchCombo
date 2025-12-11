@@ -78,8 +78,9 @@ object CobblemonEventHandlers {
         }
 
         // Battle Fled Event (player fleeing from wild battle)
-        // BattleFledEvent.player is PlayerBattleActor, need to get entity from it
-        // event.player.entity returns ServerPlayer? (may be null if player disconnected)
+        // BattleFledEvent properties (from Cobblemon API):
+        //   - battle: PokemonBattle - The battle instance
+        //   - player: PlayerBattleActor - The player who fled
         // IMPORTANT: Only reset combo for wild battles, not PvP or trainer battles
         try {
             CobblemonEvents.BATTLE_FLED.subscribe(Priority.NORMAL) { event ->
@@ -87,10 +88,13 @@ object CobblemonEventHandlers {
                     // Get the ServerPlayerEntity from PlayerBattleActor
                     val player = event.player.entity ?: return@subscribe
 
+                    // Use event.battle directly (not event.player.battle)
+                    // This is more reliable and matches the API design
+                    val battle = event.battle
+
                     // Check if this is a wild battle by looking for non-player actors
                     // Wild battles have at least one non-player actor (the wild Pokemon)
                     // PvP battles only have PlayerBattleActors
-                    val battle = event.player.battle ?: return@subscribe
                     val hasWildPokemon = battle.actors.any { actor ->
                         actor !is PlayerBattleActor
                     }
