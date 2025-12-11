@@ -141,8 +141,12 @@ class CatchComboSpawnInfluence(
         val roll = Random.nextDouble()
         val isShiny = roll < boostedProbability
 
+        // IMPORTANT: Always set props.shiny to prevent Cobblemon's default shiny roll
+        // If we only set it when isShiny=true, Cobblemon would do another roll when isShiny=false,
+        // resulting in higher shiny rates than intended (double-roll bug)
+        action.props.shiny = isShiny
+
         if (isShiny) {
-            action.props.shiny = true
             debug("SHINY! Roll: ${String.format("%.6f", roll)} < ${String.format("%.6f", boostedProbability)}")
             CobbleCatchCombo.LOGGER.debug(
                 "Catch combo made spawn shiny! Player: ${player.name.string}, " +

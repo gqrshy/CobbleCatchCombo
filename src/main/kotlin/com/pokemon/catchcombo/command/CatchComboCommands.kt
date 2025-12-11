@@ -3,6 +3,7 @@ package com.pokemon.catchcombo.command
 import com.mojang.brigadier.CommandDispatcher
 import com.mojang.brigadier.context.CommandContext
 import com.pokemon.catchcombo.CobbleCatchCombo
+import com.pokemon.catchcombo.util.SpeciesUtils
 import net.minecraft.server.command.CommandManager.literal
 import net.minecraft.server.command.ServerCommandSource
 import net.minecraft.text.Text
@@ -56,7 +57,7 @@ object CatchComboCommands {
             return 1
         }
 
-        val speciesName = formatSpeciesName(comboData.chainedSpecies ?: "Unknown")
+        val speciesName = SpeciesUtils.formatSpeciesName(comboData.chainedSpecies ?: "Unknown")
         val nextMilestone = bonusCalculator.getNextMilestone(comboData.comboCount)
 
         val message = buildString {
@@ -110,7 +111,7 @@ object CatchComboCommands {
         val resetResult = comboManager.resetCombo(player.uuid)
 
         if (resetResult != null) {
-            val speciesName = formatSpeciesName(resetResult.previousSpecies ?: "Unknown")
+            val speciesName = SpeciesUtils.formatSpeciesName(resetResult.previousSpecies ?: "Unknown")
             source.sendFeedback({
                 Text.literal("§cYour ${resetResult.previousCombo} combo of $speciesName has been reset.")
             }, false)
@@ -119,12 +120,5 @@ object CatchComboCommands {
         }
 
         return 1
-    }
-
-    private fun formatSpeciesName(speciesId: String): String {
-        val name = speciesId.substringAfter(":")
-        return name.split("_").joinToString(" ") { word ->
-            word.replaceFirstChar { it.uppercase() }
-        }
     }
 }

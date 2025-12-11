@@ -1,11 +1,11 @@
 package com.pokemon.catchcombo.integration
 
 import com.cobblemon.mod.common.Cobblemon
-import com.cobblemon.mod.common.api.pokemon.PokemonSpecies
 import com.pokemon.catchcombo.CobbleCatchCombo
 import com.pokemon.catchcombo.lang.LanguageManager
 import com.pokemon.catchcombo.service.BonusCalculator
 import com.pokemon.catchcombo.service.ComboManager
+import com.pokemon.catchcombo.util.SpeciesUtils
 import eu.pb4.placeholders.api.PlaceholderContext
 import eu.pb4.placeholders.api.PlaceholderResult
 import eu.pb4.placeholders.api.Placeholders
@@ -41,7 +41,7 @@ class PlaceholderApiIntegration(
         registerPlaceholder("combo_species") { ctx ->
             val player = ctx.player() ?: return@registerPlaceholder PlaceholderResult.value(Text.literal(""))
             val species = comboManager.getChainedSpecies(player.uuid)
-            val displayName = species?.let { formatSpeciesName(it) } ?: ""
+            val displayName = species?.let { SpeciesUtils.formatSpeciesName(it) } ?: ""
             PlaceholderResult.value(Text.literal(displayName))
         }
 
@@ -121,34 +121,6 @@ class PlaceholderApiIntegration(
         val identifier = Identifier.of(CobbleCatchCombo.MOD_ID, name)
         Placeholders.register(identifier) { ctx, _ ->
             handler(ctx)
-        }
-    }
-
-    /**
-     * Format species name using Cobblemon's translated name if available.
-     * Falls back to formatted string manipulation if translation not found.
-     */
-    private fun formatSpeciesName(speciesId: String): String {
-        return try {
-            val identifier = Identifier.tryParse(speciesId)
-            if (identifier != null) {
-                val species = PokemonSpecies.getByIdentifier(identifier)
-                species?.translatedName?.string ?: fallbackFormatName(speciesId)
-            } else {
-                fallbackFormatName(speciesId)
-            }
-        } catch (e: Exception) {
-            fallbackFormatName(speciesId)
-        }
-    }
-
-    /**
-     * Fallback formatting: Convert "cobblemon:galarian_ponyta" to "Galarian Ponyta"
-     */
-    private fun fallbackFormatName(speciesId: String): String {
-        val name = speciesId.substringAfter(":")
-        return name.split("_").joinToString(" ") { word ->
-            word.replaceFirstChar { it.uppercase() }
         }
     }
 

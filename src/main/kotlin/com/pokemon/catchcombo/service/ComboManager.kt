@@ -72,7 +72,8 @@ class ComboManager(private val bonusCalculator: BonusCalculator) {
 
         return CaptureResult(
             chainBroken = chainBroken,
-            previousCombo = if (chainBroken) oldCombo else data.comboCount - 1,
+            // Ensure previousCombo is never negative (defensive check)
+            previousCombo = (if (chainBroken) oldCombo else data.comboCount - 1).coerceAtLeast(0),
             previousSpecies = if (chainBroken) oldSpecies else null,
             newCombo = data.comboCount,
             newSpecies = speciesId,

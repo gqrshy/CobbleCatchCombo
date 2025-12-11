@@ -1,24 +1,27 @@
 package com.pokemon.catchcombo.display
 
-import com.cobblemon.mod.common.api.pokemon.PokemonSpecies
+import com.pokemon.catchcombo.CobbleCatchCombo
 import com.pokemon.catchcombo.config.CatchComboConfig
 import com.pokemon.catchcombo.lang.LanguageManager
 import com.pokemon.catchcombo.service.BonusCalculator
 import com.pokemon.catchcombo.service.ComboManager
+import com.pokemon.catchcombo.util.SpeciesUtils
 import net.minecraft.entity.boss.BossBar
 import net.minecraft.entity.boss.ServerBossBar
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.network.ServerPlayerEntity
 import net.minecraft.text.Text
-import net.minecraft.util.Identifier
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 class DisplayManager(
-    private val config: CatchComboConfig,
-    private val languageManager: LanguageManager,
-    private val bonusCalculator: BonusCalculator
+    private val languageManager: LanguageManager
 ) {
+    // Fetch config and bonusCalculator dynamically to support config reload
+    private val config: CatchComboConfig
+        get() = CobbleCatchCombo.configManager.config
+    private val bonusCalculator: BonusCalculator
+        get() = CobbleCatchCombo.bonusCalculator
     private val playerBossBars = ConcurrentHashMap<UUID, ServerBossBar>()
     private val hideScheduledTicks = ConcurrentHashMap<UUID, Long>()
 
@@ -30,7 +33,7 @@ class DisplayManager(
     }
 
     fun showComboDisplay(player: ServerPlayerEntity, captureResult: ComboManager.CaptureResult) {
-        val speciesName = formatSpeciesName(captureResult.newSpecies)
+        val speciesName = SpeciesUtils.formatSpeciesName(captureResult.newSpecies)
 
         if (config.display.bossBar.enabled) {
             showBossBar(player, captureResult, speciesName)
@@ -165,8 +168,8 @@ class DisplayManager(
     }
 
     private fun getPreviousMilestone(combo: Int): Int {
-        val shinyTiers = CobbleCatchCombo.configManager.config.shinyBoost.tiers
-        val ivTiers = CobbleCatchCombo.configManager.config.ivBoost.tiers
+        val shinyTiers = config.shinyBoost.tiers
+        val ivTiers = config.ivBoost.tiers
 
         val allMilestones = (shinyTiers.map { it.minCombo } + ivTiers.map { it.minCombo })
             .distinct()
@@ -197,7 +200,7 @@ class DisplayManager(
         if (previousCombo < config.notifications.onComboBreak.minComboToNotify) return
 
         val locale = languageManager.getPlayerLocale(player)
-        val speciesName = previousSpecies?.let { formatSpeciesName(it) } ?: "Unknown"
+        val speciesName = previousSpecies?.let { SpeciesUtils.formatSpeciesName(it) } ?: "Unknown"
 
         val message = languageManager.translate("cobblecatchcombo.combo.break", locale, mapOf(
             "count" to previousCombo.toString(),
@@ -248,42 +251,10 @@ class DisplayManager(
         }
     }
 
-    private fun formatSpeciesName(speciesId: String): String {
-        // Try to get the translated species name from Cobblemon
-        return try {
-            val identifier = Identifier.tryParse(speciesId)
-            if (identifier != null) {
-                val species = PokemonSpecies.getByIdentifier(identifier)
-                species?.translatedName?.string ?: fallbackFormatName(speciesId)
-            } else {
-                fallbackFormatName(speciesId)
-            }
-        } catch (e: Exception) {
-            fallbackFormatName(speciesId)
-        }
-    }
-
-    private fun fallbackFormatName(speciesId: String): String {
-        // Fallback: Convert "cobblemon:galarian_ponyta" to "Galarian Ponyta"
-        val name = speciesId.substringAfter(":")
-        return name.split("_").joinToString(" ") { word ->
-            word.replaceFirstChar { it.uppercase() }
-        }
-    }
-
     fun shutdown() {
         playerBossBars.values.forEach { it.clearPlayers() }
         playerBossBars.clear()
         hideScheduledTicks.clear()
         server = null
-    }
-
-    companion object {
-        private lateinit var instance: DisplayManager
-
-        // For reference in other classes
-        object CobbleCatchCombo {
-            val configManager get() = com.pokemon.catchcombo.CobbleCatchCombo.configManager
-        }
     }
 }

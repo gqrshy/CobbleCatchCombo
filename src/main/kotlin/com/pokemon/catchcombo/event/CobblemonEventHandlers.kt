@@ -44,18 +44,20 @@ import net.minecraft.server.network.ServerPlayerEntity
 object CobblemonEventHandlers {
     private lateinit var comboManager: ComboManager
     private lateinit var displayManager: DisplayManager
-    private lateinit var config: CatchComboConfig
     private lateinit var languageManager: LanguageManager
+
+    // Fetch config dynamically to support config reload
+    // This ensures event handlers always use the current config values
+    private val config: CatchComboConfig
+        get() = CobbleCatchCombo.configManager.config
 
     fun register(
         comboManager: ComboManager,
         displayManager: DisplayManager,
-        config: CatchComboConfig,
         languageManager: LanguageManager
     ) {
         this.comboManager = comboManager
         this.displayManager = displayManager
-        this.config = config
         this.languageManager = languageManager
 
         registerCobblemonEvents()
@@ -78,13 +80,23 @@ object CobblemonEventHandlers {
         // Battle Fled Event (player fleeing from wild battle)
         // BattleFledEvent.player is PlayerBattleActor, need to get entity from it
         // event.player.entity returns ServerPlayer? (may be null if player disconnected)
+        // IMPORTANT: Only reset combo for wild battles, not PvP or trainer battles
         try {
             CobblemonEvents.BATTLE_FLED.subscribe(Priority.NORMAL) { event ->
                 try {
                     // Get the ServerPlayerEntity from PlayerBattleActor
-                    // PlayerBattleActor.entity returns the underlying player
-                    val player = event.player.entity
-                    if (player != null) {
+                    val player = event.player.entity ?: return@subscribe
+
+                    // Check if this is a wild battle by looking for non-player actors
+                    // Wild battles have at least one non-player actor (the wild Pokemon)
+                    // PvP battles only have PlayerBattleActors
+                    val battle = event.player.battle ?: return@subscribe
+                    val hasWildPokemon = battle.actors.any { actor ->
+                        actor !is PlayerBattleActor
+                    }
+
+                    // Only reset combo if fleeing from a wild battle
+                    if (hasWildPokemon) {
                         handleBattleFled(player)
                     }
                 } catch (e: Exception) {
