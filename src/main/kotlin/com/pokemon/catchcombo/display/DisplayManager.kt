@@ -23,7 +23,9 @@ class DisplayManager(
     private val bonusCalculator: BonusCalculator
         get() = CobbleCatchCombo.bonusCalculator
     private val playerBossBars = ConcurrentHashMap<UUID, ServerBossBar>()
-    private val hideScheduledTicks = ConcurrentHashMap<UUID, Long>()
+    // Use system time (millis) instead of world ticks for more reliable timing
+    // World ticks can be affected by /time commands or dimension changes
+    private val hideScheduledTime = ConcurrentHashMap<UUID, Long>()
 
     // Server reference for main thread execution
     private var server: MinecraftServer? = null
@@ -58,8 +60,13 @@ class DisplayManager(
         val progress = if (nextMilestone != null && config.display.bossBar.showProgressToNextTier) {
             val previousMilestone = getPreviousMilestone(result.newCombo)
             val range = nextMilestone - previousMilestone
-            val current = result.newCombo - previousMilestone
-            (current.toFloat() / range.toFloat()).coerceIn(0f, 1f)
+            // Guard against division by zero (can happen with misconfigured tiers)
+            if (range <= 0) {
+                1f
+            } else {
+                val current = result.newCombo - previousMilestone
+                (current.toFloat() / range.toFloat()).coerceIn(0f, 1f)
+            }
         } else {
             1f
         }
@@ -84,10 +91,9 @@ class DisplayManager(
             bossBar.addPlayer(player)
         }
 
-        // Schedule hide using server ticks (20 ticks = 1 second)
-        val hideDelayTicks = config.display.bossBar.showDurationSeconds * 20L
-        val currentTick = server?.overworld?.time ?: 0L
-        hideScheduledTicks[uuid] = currentTick + hideDelayTicks
+        // Schedule hide using system time (more reliable than world ticks)
+        val hideDelayMillis = config.display.bossBar.showDurationSeconds * 1000L
+        hideScheduledTime[uuid] = System.currentTimeMillis() + hideDelayMillis
     }
 
     /**
@@ -95,17 +101,20 @@ class DisplayManager(
      * This ensures boss bar operations happen on the main thread.
      */
     fun tick() {
-        val currentTick = server?.overworld?.time ?: return
+        // Skip if no scheduled hides
+        if (hideScheduledTime.isEmpty()) return
 
+        val currentTime = System.currentTimeMillis()
         val toRemove = mutableListOf<UUID>()
-        hideScheduledTicks.forEach { (uuid, hideTick) ->
-            if (currentTick >= hideTick) {
+
+        hideScheduledTime.forEach { (uuid, hideTime) ->
+            if (currentTime >= hideTime) {
                 toRemove.add(uuid)
             }
         }
 
         toRemove.forEach { uuid ->
-            hideScheduledTicks.remove(uuid)
+            hideScheduledTime.remove(uuid)
             hideBossBar(uuid)
         }
     }
@@ -161,6 +170,12 @@ class DisplayManager(
 
         val previousMilestone = getPreviousMilestone(currentCombo)
         val range = nextMilestone - previousMilestone
+
+        // Guard against division by zero (can happen with misconfigured tiers)
+        if (range <= 0) {
+            return filled.repeat(barLength)
+        }
+
         val current = currentCombo - previousMilestone
         val filledCount = ((current.toFloat() / range.toFloat()) * barLength).toInt().coerceIn(0, barLength)
 
@@ -231,7 +246,7 @@ class DisplayManager(
     }
 
     fun removePlayer(playerUuid: UUID) {
-        hideScheduledTicks.remove(playerUuid)
+        hideScheduledTime.remove(playerUuid)
         hideBossBar(playerUuid)
     }
 
@@ -254,7 +269,7 @@ class DisplayManager(
     fun shutdown() {
         playerBossBars.values.forEach { it.clearPlayers() }
         playerBossBars.clear()
-        hideScheduledTicks.clear()
+        hideScheduledTime.clear()
         server = null
     }
 }

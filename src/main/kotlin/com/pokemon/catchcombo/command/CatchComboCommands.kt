@@ -2,7 +2,6 @@ package com.pokemon.catchcombo.command
 
 import com.mojang.brigadier.CommandDispatcher
 import com.mojang.brigadier.context.CommandContext
-import com.mojang.brigadier.arguments.StringArgumentType
 import com.pokemon.catchcombo.CobbleCatchCombo
 import com.pokemon.catchcombo.util.SpeciesUtils
 import net.minecraft.command.argument.EntityArgumentType

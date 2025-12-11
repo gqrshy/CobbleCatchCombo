@@ -8,7 +8,13 @@ import java.util.UUID
 /**
  * Manages player catch combo data.
  *
- * Note: This class delegates caching to the repository layer (SQLiteRepository)
+ * Thread Safety:
+ * - This class is designed to be used from the main server thread only
+ * - Minecraft game events (captures, battles) are processed on the main thread
+ * - For cross-server databases (MySQL/MongoDB), data consistency is handled via
+ *   immediate database writes and cache staleness checks (5-second window)
+ *
+ * Note: This class delegates caching to the repository layer
  * to avoid duplicate caching and potential synchronization issues.
  */
 class ComboManager {
