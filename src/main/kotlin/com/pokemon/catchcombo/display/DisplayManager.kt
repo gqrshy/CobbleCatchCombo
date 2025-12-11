@@ -318,7 +318,11 @@ class DisplayManager(
 
     private fun getBossBarStyle(): BossBar.Style {
         return try {
-            BossBar.Style.valueOf(config.display.bossBar.style.uppercase())
+            // Map common config names to Minecraft enum names
+            // Config may use "SEGMENTED_X" but Minecraft uses "NOTCHED_X"
+            val normalizedStyle = config.display.bossBar.style.uppercase()
+                .replace("SEGMENTED_", "NOTCHED_")
+            BossBar.Style.valueOf(normalizedStyle)
         } catch (e: Exception) {
             BossBar.Style.PROGRESS
         }

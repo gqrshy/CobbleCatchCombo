@@ -68,9 +68,11 @@ class MySQLRepository(private val config: MysqlConfig) : ComboRepository {
         var tempDataSource: HikariDataSource? = null
         try {
             // Build JDBC URL with SSL option from config
+            // allowPublicKeyRetrieval is only safe when SSL is enabled
             val sslParam = if (config.useSSL) "useSSL=true&requireSSL=true" else "useSSL=false"
+            val publicKeyParam = if (config.useSSL) "allowPublicKeyRetrieval=true" else "allowPublicKeyRetrieval=false"
             val jdbcUrl = "jdbc:mysql://${config.host}:${config.port}/${config.database}?" +
-                "$sslParam&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+                "$sslParam&$publicKeyParam&serverTimezone=UTC"
 
             val hikariConfig = HikariConfig().apply {
                 this.jdbcUrl = jdbcUrl

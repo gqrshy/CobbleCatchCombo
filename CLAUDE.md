@@ -52,9 +52,13 @@ src/main/kotlin/com/pokemon/catchcombo/
 | MySQL | `mysql` | ✅ | HikariCP接続プール、マルチサーバー対応 |
 | MongoDB | `mongodb` | ✅ | ドキュメントDB、マルチサーバー対応 |
 
-## 未実装機能
+## 設定オプション詳細
 
-以下は設定に存在するが未実装：
+### 進化系統を同種扱い
+`combo.treatEvolutionLineAsSameSpecies`を有効にすると、進化ラインが同じポケモンを同種として扱います。
+- 例：ピチュー → ピカチュウ → ライチュウ は同じコンボとしてカウント
+- イーブイ → ブイズ各種 も同じコンボとしてカウント
 
-1. **進化系統を同種扱い** - `combo.treatEvolutionLineAsSameSpecies`設定あり、ロジック未実装
-2. **ActionBar表示時間** - `actionBar.showDurationSeconds`設定あり、ActionBarは自動フェードのため未使用
+### ActionBar表示時間
+`actionBar.showDurationSeconds`で指定した秒数、ActionBarを表示し続けます。
+Minecraftの自動フェード（約2秒）を回避するため、定期的に再送信しています。

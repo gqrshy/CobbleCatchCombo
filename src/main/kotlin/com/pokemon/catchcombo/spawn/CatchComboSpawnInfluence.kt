@@ -102,7 +102,9 @@ class CatchComboSpawnInfluence(
 
         // Determine if this species qualifies for bonuses
         // Note: Regional forms share the same base species ID, so they match
-        val isChainedSpecies = if (config.combo.treatEvolutionLineAsSameSpecies) {
+        val isChainedSpecies = if (chainedSpecies == null) {
+            false
+        } else if (config.combo.treatEvolutionLineAsSameSpecies) {
             // Compare using evolution line - e.g., Pikachu spawn gets bonus from Pichu chain
             SpeciesUtils.areInSameEvolutionLine(chainedSpecies, speciesId)
         } else {
