@@ -62,8 +62,21 @@ dependencies {
     // Kotlinx Serialization for JSON5 config
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
+    // Database Drivers
     // SQLite JDBC
     implementation(include("org.xerial:sqlite-jdbc:3.46.1.0")!!)
+
+    // MySQL Connector/J (cross-server support)
+    implementation(include("com.mysql:mysql-connector-j:8.3.0")!!)
+
+    // HikariCP for MySQL connection pooling (cross-server support)
+    implementation(include("com.zaxxer:HikariCP:5.1.0")!!)
+
+    // MongoDB Driver (cross-server support)
+    implementation(include("org.mongodb:mongodb-driver-sync:5.1.0")!!)
+
+    // SLF4J NOP to suppress HikariCP logging noise (optional, uses Fabric's logging)
+    implementation(include("org.slf4j:slf4j-api:2.0.9")!!)
 }
 
 tasks.processResources {

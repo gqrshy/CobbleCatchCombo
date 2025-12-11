@@ -15,7 +15,7 @@ Cobblemon 1.7.1用キャッチコンボMod（Fabric/Kotlin）
 src/main/kotlin/com/pokemon/catchcombo/
 ├── CobbleCatchCombo.kt          # エントリーポイント
 ├── config/                       # JSON5設定
-├── data/                         # データ永続化（SQLite）
+├── data/                         # データ永続化（SQLite/MySQL/MongoDB）
 ├── service/                      # ビジネスロジック
 ├── spawn/                        # SpawningInfluence（シャイニー/IV補正）
 ├── event/                        # Cobblemonイベントハンドラ
@@ -44,10 +44,17 @@ src/main/kotlin/com/pokemon/catchcombo/
 
 `config/cobblecatchcombo/config.json5`
 
+## データベース対応
+
+| タイプ | 設定値 | クロスサーバー | 説明 |
+|--------|--------|----------------|------|
+| SQLite | `sqlite` | ❌ | 単一サーバー向け（デフォルト） |
+| MySQL | `mysql` | ✅ | HikariCP接続プール、マルチサーバー対応 |
+| MongoDB | `mongodb` | ✅ | ドキュメントDB、マルチサーバー対応 |
+
 ## 未実装機能
 
 以下は設定に存在するが未実装：
 
-1. **MySQL/MongoDB対応** - `database.mysql`, `database.mongodb`設定あり、SQLiteのみ実装
-2. **進化系統を同種扱い** - `combo.treatEvolutionLineAsSameSpecies`設定あり、ロジック未実装
-3. **ActionBar表示時間** - `actionBar.showDurationSeconds`設定あり、ActionBarは自動フェードのため未使用
+1. **進化系統を同種扱い** - `combo.treatEvolutionLineAsSameSpecies`設定あり、ロジック未実装
+2. **ActionBar表示時間** - `actionBar.showDurationSeconds`設定あり、ActionBarは自動フェードのため未使用

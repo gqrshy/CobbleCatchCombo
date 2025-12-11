@@ -2,7 +2,7 @@ package com.pokemon.catchcombo
 
 import com.pokemon.catchcombo.command.CatchComboCommands
 import com.pokemon.catchcombo.config.ConfigManager
-import com.pokemon.catchcombo.data.SQLiteRepository
+import com.pokemon.catchcombo.data.RepositoryFactory
 import com.pokemon.catchcombo.display.DisplayManager
 import com.pokemon.catchcombo.event.CobblemonEventHandlers
 import com.pokemon.catchcombo.integration.PlaceholderApiIntegration
@@ -79,7 +79,18 @@ object CobbleCatchCombo : ModInitializer {
         // Register server lifecycle events
         ServerLifecycleEvents.SERVER_STARTING.register { server ->
             LOGGER.info("Server starting, initializing database...")
-            val repository = SQLiteRepository(configDir.resolve("data"))
+
+            // Create repository based on config (supports SQLite, MySQL, MongoDB)
+            val dbConfig = configManager.config.database
+            val repository = RepositoryFactory.createRepository(dbConfig, configDir.resolve("data"))
+
+            // Log cross-server status
+            if (RepositoryFactory.isCrossServerEnabled(dbConfig)) {
+                LOGGER.info("Cross-server synchronization ENABLED via ${RepositoryFactory.getDatabaseDescription(dbConfig)}")
+            } else {
+                LOGGER.info("Single-server mode (SQLite)")
+            }
+
             comboManager.initialize(repository)
             displayManager.setServer(server)
         }
