@@ -33,7 +33,9 @@ data class MysqlConfig(
     val database: String = "cobblecatchcombo",
     val username: String = "root",
     val password: String = "",
-    val tablePrefix: String = "ccc_"
+    val tablePrefix: String = "ccc_",
+    val useSSL: Boolean = false,
+    val maxPoolSize: Int = 10
 )
 
 @Serializable

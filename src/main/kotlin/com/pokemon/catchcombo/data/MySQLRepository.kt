@@ -22,6 +22,9 @@ import java.util.concurrent.ConcurrentHashMap
  * - Data is written immediately to database for cross-server visibility
  * - Cache is used for read performance, refreshed on access if stale
  * - Uses REPLACE INTO for upsert operations (MySQL specific)
+ *
+ * Security:
+ * - Table prefix is validated to prevent SQL injection
  */
 class MySQLRepository(private val config: MysqlConfig) : ComboRepository {
     private var dataSource: HikariDataSource? = null
@@ -36,20 +39,48 @@ class MySQLRepository(private val config: MysqlConfig) : ComboRepository {
         fun isStale(): Boolean = System.currentTimeMillis() - cachedAt > 5000
     }
 
-    private val tableName: String
-        get() = "${config.tablePrefix}combo_data"
+    // Validated table name to prevent SQL injection
+    private val tableName: String by lazy {
+        val prefix = sanitizeIdentifier(config.tablePrefix)
+        "${prefix}combo_data"
+    }
+
+    companion object {
+        // Pattern for valid SQL identifiers (alphanumeric and underscore only)
+        private val VALID_IDENTIFIER_PATTERN = Regex("^[a-zA-Z0-9_]*$")
+
+        /**
+         * Sanitize a SQL identifier to prevent SQL injection.
+         * Only allows alphanumeric characters and underscores.
+         */
+        fun sanitizeIdentifier(identifier: String): String {
+            if (!VALID_IDENTIFIER_PATTERN.matches(identifier)) {
+                CobbleCatchCombo.LOGGER.warn(
+                    "Invalid table prefix '$identifier' - contains disallowed characters. Using 'ccc_' instead."
+                )
+                return "ccc_"
+            }
+            return identifier
+        }
+    }
 
     override fun initialize() {
+        var tempDataSource: HikariDataSource? = null
         try {
+            // Build JDBC URL with SSL option from config
+            val sslParam = if (config.useSSL) "useSSL=true&requireSSL=true" else "useSSL=false"
+            val jdbcUrl = "jdbc:mysql://${config.host}:${config.port}/${config.database}?" +
+                "$sslParam&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+
             val hikariConfig = HikariConfig().apply {
-                jdbcUrl = "jdbc:mysql://${config.host}:${config.port}/${config.database}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+                this.jdbcUrl = jdbcUrl
                 username = config.username
                 password = config.password
                 driverClassName = "com.mysql.cj.jdbc.Driver"
 
-                // Connection pool settings optimized for game servers
-                maximumPoolSize = 10
-                minimumIdle = 2
+                // Connection pool settings from config (with sensible limits)
+                maximumPoolSize = config.maxPoolSize.coerceIn(2, 50)
+                minimumIdle = (config.maxPoolSize / 5).coerceAtLeast(1)
                 idleTimeout = 300000 // 5 minutes
                 connectionTimeout = 10000 // 10 seconds
                 maxLifetime = 600000 // 10 minutes
@@ -64,11 +95,23 @@ class MySQLRepository(private val config: MysqlConfig) : ComboRepository {
                 poolName = "CobbleCatchCombo-MySQL"
             }
 
-            dataSource = HikariDataSource(hikariConfig)
+            tempDataSource = HikariDataSource(hikariConfig)
+
+            // Verify connection before assigning
+            tempDataSource.connection?.use { conn ->
+                if (!conn.isValid(5)) {
+                    throw IllegalStateException("MySQL connection validation failed")
+                }
+            } ?: throw IllegalStateException("Failed to obtain initial MySQL connection")
+
+            dataSource = tempDataSource
             createTables()
 
-            CobbleCatchCombo.LOGGER.info("MySQL database connected: ${config.host}:${config.port}/${config.database}")
+            CobbleCatchCombo.LOGGER.info("MySQL database connected: ${config.host}:${config.port}/${config.database} (SSL: ${config.useSSL})")
         } catch (e: Exception) {
+            // Clean up on failure
+            tempDataSource?.close()
+            dataSource = null
             CobbleCatchCombo.LOGGER.error("Failed to initialize MySQL database", e)
             throw e
         }

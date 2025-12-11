@@ -128,9 +128,25 @@ object CobbleCatchCombo : ModInitializer {
 
     fun isCobblemonLoaded(): Boolean = cobblemonLoaded
 
+    // Track initial database config for reload warnings
+    private var initialDbType: String? = null
+
     fun reloadConfig() {
+        // Store initial db type on first reload (or compare on subsequent reloads)
+        val currentDbType = configManager.config.database.type
+        if (initialDbType == null) {
+            initialDbType = currentDbType
+        }
+
         configManager.reloadConfig()
         languageManager.loadLanguages()
+
+        // Warn if database type was changed (requires restart to take effect)
+        val newDbType = configManager.config.database.type
+        if (initialDbType != newDbType) {
+            LOGGER.warn("Database type changed from '$initialDbType' to '$newDbType'. Server restart required for this change to take effect.")
+        }
+
         // Update bonus calculator with new config
         bonusCalculator = BonusCalculator(configManager.config)
         // Clear spawn influence cache in case species registry changed

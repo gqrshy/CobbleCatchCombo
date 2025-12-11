@@ -45,17 +45,33 @@ class MongoDBRepository(private val config: MongodbConfig) : ComboRepository {
     }
 
     override fun initialize() {
+        var tempClient: MongoClient? = null
         try {
             // Create MongoDB client from connection string
-            mongoClient = MongoClients.create(config.connectionString)
-            database = mongoClient!!.getDatabase(config.database)
-            collection = database!!.getCollection(config.collection)
+            tempClient = MongoClients.create(config.connectionString)
+
+            // Verify connection by pinging the database
+            val tempDatabase = tempClient.getDatabase(config.database)
+            tempDatabase.runCommand(org.bson.Document("ping", 1))
+
+            val tempCollection = tempDatabase.getCollection(config.collection)
+
+            // Only assign after successful connection verification
+            mongoClient = tempClient
+            database = tempDatabase
+            collection = tempCollection
 
             // Create indexes for efficient queries
             createIndexes()
 
+            // Log without connection string (may contain credentials)
             CobbleCatchCombo.LOGGER.info("MongoDB connected: ${config.database}/${config.collection}")
         } catch (e: Exception) {
+            // Clean up on failure
+            tempClient?.close()
+            mongoClient = null
+            database = null
+            collection = null
             CobbleCatchCombo.LOGGER.error("Failed to initialize MongoDB database", e)
             throw e
         }
