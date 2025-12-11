@@ -34,6 +34,7 @@ class ConfigManager {
                 // Strip JSON5 comments for parsing
                 val jsonContent = stripJson5Comments(content)
                 config = json.decodeFromString<CatchComboConfig>(jsonContent)
+                validateConfig()
                 CobbleCatchCombo.LOGGER.info("Config loaded successfully")
             } else {
                 // Create default config
@@ -44,6 +45,77 @@ class ConfigManager {
             CobbleCatchCombo.LOGGER.error("Failed to load config, using defaults", e)
             config = CatchComboConfig()
             saveConfig()
+        }
+    }
+
+    /**
+     * Validate config values and log warnings for any issues.
+     * Invalid values are corrected to sensible defaults where possible.
+     */
+    private fun validateConfig() {
+        var hasWarnings = false
+
+        // Validate shiny tiers
+        config.shinyBoost.tiers.forEachIndexed { index, tier ->
+            if (tier.minCombo < 0) {
+                CobbleCatchCombo.LOGGER.warn("shinyBoost.tiers[$index].minCombo is negative (${tier.minCombo}), should be >= 0")
+                hasWarnings = true
+            }
+            if (tier.multiplier < 1.0) {
+                CobbleCatchCombo.LOGGER.warn("shinyBoost.tiers[$index].multiplier is < 1.0 (${tier.multiplier}), will be clamped to 1.0")
+                hasWarnings = true
+            }
+        }
+
+        // Validate IV tiers
+        config.ivBoost.tiers.forEachIndexed { index, tier ->
+            if (tier.minCombo < 0) {
+                CobbleCatchCombo.LOGGER.warn("ivBoost.tiers[$index].minCombo is negative (${tier.minCombo}), should be >= 0")
+                hasWarnings = true
+            }
+            if (tier.guaranteedPerfectIVs < 0 || tier.guaranteedPerfectIVs > 6) {
+                CobbleCatchCombo.LOGGER.warn("ivBoost.tiers[$index].guaranteedPerfectIVs is out of range (${tier.guaranteedPerfectIVs}), will be clamped to 0-6")
+                hasWarnings = true
+            }
+        }
+
+        // Validate display durations
+        if (config.display.bossBar.showDurationSeconds < 0) {
+            CobbleCatchCombo.LOGGER.warn("display.bossBar.showDurationSeconds is negative (${config.display.bossBar.showDurationSeconds}), should be >= 0")
+            hasWarnings = true
+        }
+        if (config.display.actionBar.showDurationSeconds < 0) {
+            CobbleCatchCombo.LOGGER.warn("display.actionBar.showDurationSeconds is negative (${config.display.actionBar.showDurationSeconds}), should be >= 0")
+            hasWarnings = true
+        }
+
+        // Validate notification thresholds
+        if (config.notifications.onComboBreak.minComboToNotify < 0) {
+            CobbleCatchCombo.LOGGER.warn("notifications.onComboBreak.minComboToNotify is negative, should be >= 0")
+            hasWarnings = true
+        }
+
+        // Validate database config
+        val dbType = config.database.type.lowercase()
+        if (dbType !in listOf("sqlite", "mysql", "mongodb", "mongo", "mariadb")) {
+            CobbleCatchCombo.LOGGER.warn("Unknown database type '${config.database.type}', will fall back to SQLite")
+            hasWarnings = true
+        }
+
+        // Validate MySQL config if using MySQL
+        if (dbType in listOf("mysql", "mariadb")) {
+            if (config.database.mysql.port < 1 || config.database.mysql.port > 65535) {
+                CobbleCatchCombo.LOGGER.warn("mysql.port is out of valid range (${config.database.mysql.port}), should be 1-65535")
+                hasWarnings = true
+            }
+            if (config.database.mysql.maxPoolSize < 1) {
+                CobbleCatchCombo.LOGGER.warn("mysql.maxPoolSize is < 1 (${config.database.mysql.maxPoolSize}), will be clamped to minimum 2")
+                hasWarnings = true
+            }
+        }
+
+        if (hasWarnings) {
+            CobbleCatchCombo.LOGGER.warn("Config validation completed with warnings. Some values may be auto-corrected at runtime.")
         }
     }
 

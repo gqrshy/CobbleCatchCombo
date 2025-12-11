@@ -93,10 +93,13 @@ class LanguageManager {
             }
 
             // Load all language files
-            Files.list(langDir).forEach { path ->
-                if (path.toString().endsWith(".json")) {
-                    val locale = path.fileName.toString().removeSuffix(".json")
-                    loadLanguageFile(locale, path)
+            // IMPORTANT: Files.list() returns a Stream that must be closed
+            Files.list(langDir).use { stream ->
+                stream.forEach { path ->
+                    if (path.toString().endsWith(".json")) {
+                        val locale = path.fileName.toString().removeSuffix(".json")
+                        loadLanguageFile(locale, path)
+                    }
                 }
             }
 
@@ -114,7 +117,15 @@ class LanguageManager {
             val jsonObject = json.decodeFromString<JsonObject>(content)
             val trans = mutableMapOf<String, String>()
             jsonObject.forEach { (key, value) ->
-                trans[key] = value.jsonPrimitive.content
+                // Only process string primitives, skip nested objects/arrays
+                try {
+                    if (value.jsonPrimitive.isString) {
+                        trans[key] = value.jsonPrimitive.content
+                    }
+                } catch (e: IllegalArgumentException) {
+                    // Skip non-primitive values (nested objects, arrays)
+                    CobbleCatchCombo.LOGGER.debug("Skipping non-string value for key '$key' in $locale")
+                }
             }
             translations[locale] = trans
         } catch (e: Exception) {

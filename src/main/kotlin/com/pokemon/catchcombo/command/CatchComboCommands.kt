@@ -2,10 +2,14 @@ package com.pokemon.catchcombo.command
 
 import com.mojang.brigadier.CommandDispatcher
 import com.mojang.brigadier.context.CommandContext
+import com.mojang.brigadier.arguments.StringArgumentType
 import com.pokemon.catchcombo.CobbleCatchCombo
 import com.pokemon.catchcombo.util.SpeciesUtils
+import net.minecraft.command.argument.EntityArgumentType
 import net.minecraft.server.command.CommandManager.literal
+import net.minecraft.server.command.CommandManager.argument
 import net.minecraft.server.command.ServerCommandSource
+import net.minecraft.server.network.ServerPlayerEntity
 import net.minecraft.text.Text
 
 object CatchComboCommands {
@@ -25,7 +29,14 @@ object CatchComboCommands {
                 .then(
                     literal("reset")
                         .requires { it.hasPermissionLevel(2) }
-                        .executes { context -> resetCombo(context) }
+                        .executes { context -> resetCombo(context, null) }
+                        .then(
+                            argument("player", EntityArgumentType.player())
+                                .executes { context ->
+                                    val target = EntityArgumentType.getPlayer(context, "player")
+                                    resetCombo(context, target)
+                                }
+                        )
                 )
         )
 
@@ -98,25 +109,41 @@ object CatchComboCommands {
         }
     }
 
-    private fun resetCombo(context: CommandContext<ServerCommandSource>): Int {
+    private fun resetCombo(context: CommandContext<ServerCommandSource>, targetPlayer: ServerPlayerEntity?): Int {
         val source = context.source
-        val player = source.player
+        val comboManager = CobbleCatchCombo.comboManager
+
+        // If no target specified and source is a player, reset own combo
+        val player = targetPlayer ?: source.player
 
         if (player == null) {
-            source.sendError(Text.literal("This command can only be used by players"))
+            source.sendError(Text.literal("You must specify a player or run this command as a player"))
             return 0
         }
 
-        val comboManager = CobbleCatchCombo.comboManager
         val resetResult = comboManager.resetCombo(player.uuid)
+        val isSelf = targetPlayer == null || targetPlayer.uuid == source.player?.uuid
 
         if (resetResult != null) {
             val speciesName = SpeciesUtils.formatSpeciesName(resetResult.previousSpecies ?: "Unknown")
-            source.sendFeedback({
-                Text.literal("§cYour ${resetResult.previousCombo} combo of $speciesName has been reset.")
-            }, false)
+            if (isSelf) {
+                source.sendFeedback({
+                    Text.literal("§cYour ${resetResult.previousCombo} combo of $speciesName has been reset.")
+                }, false)
+            } else {
+                // Notify the admin
+                source.sendFeedback({
+                    Text.literal("§cReset ${player.name.string}'s ${resetResult.previousCombo} combo of $speciesName.")
+                }, true)
+                // Notify the target player
+                player.sendMessage(Text.literal("§cYour ${resetResult.previousCombo} combo of $speciesName was reset by an admin."), false)
+            }
         } else {
-            source.sendFeedback({ Text.literal("§7You don't have an active catch combo.") }, false)
+            if (isSelf) {
+                source.sendFeedback({ Text.literal("§7You don't have an active catch combo.") }, false)
+            } else {
+                source.sendFeedback({ Text.literal("§7${player.name.string} doesn't have an active catch combo.") }, false)
+            }
         }
 
         return 1

@@ -19,6 +19,10 @@ class PlaceholderApiIntegration(
     // Fetch bonusCalculator dynamically to support config reload
     private val bonusCalculator: BonusCalculator
         get() = CobbleCatchCombo.bonusCalculator
+
+    // Track number of registered placeholders
+    private var registeredCount = 0
+
     /**
      * Get the base shiny rate from Cobblemon's config.
      * Default is 8192 (1/8192 chance).
@@ -32,6 +36,7 @@ class PlaceholderApiIntegration(
     }
 
     fun register() {
+        registeredCount = 0
         // %cobblecatchcombo:combo_count%
         registerPlaceholder("combo_count") { ctx ->
             val player = ctx.player() ?: return@registerPlaceholder PlaceholderResult.value(Text.literal("0"))
@@ -116,7 +121,7 @@ class PlaceholderApiIntegration(
             PlaceholderResult.value(Text.literal(hasCombo.toString()))
         }
 
-        CobbleCatchCombo.LOGGER.info("Registered ${11} placeholders with Text Placeholder API")
+        CobbleCatchCombo.LOGGER.info("Registered $registeredCount placeholders with Text Placeholder API")
     }
 
     private fun registerPlaceholder(name: String, handler: (PlaceholderContext) -> PlaceholderResult) {
@@ -124,6 +129,7 @@ class PlaceholderApiIntegration(
         Placeholders.register(identifier) { ctx, _ ->
             handler(ctx)
         }
+        registeredCount++
     }
 
     private fun calculateCurrentTier(comboCount: Int): Int {
