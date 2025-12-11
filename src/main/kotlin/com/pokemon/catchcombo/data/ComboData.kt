@@ -27,15 +27,28 @@ data class ComboData(
         lastUpdated = System.currentTimeMillis()
     }
 
-    fun incrementCombo(species: String): Boolean {
-        val wasNewChain = chainedSpecies != species
+    /**
+     * Increment combo for a species.
+     * @param species The species being caught
+     * @param forceChainContinue If true, continues the chain regardless of species match
+     *                           (used for evolution line matching)
+     * @return true if this started a new chain, false if continuing existing chain
+     */
+    fun incrementCombo(species: String, forceChainContinue: Boolean = false): Boolean {
+        val wasNewChain = if (forceChainContinue) {
+            // Evolution line match - continue chain but update species
+            false
+        } else {
+            chainedSpecies != species
+        }
 
         if (wasNewChain) {
             // Starting new chain
             chainedSpecies = species
             comboCount = 1
         } else {
-            // Continuing chain
+            // Continuing chain - update species to current and increment
+            chainedSpecies = species
             comboCount++
         }
 

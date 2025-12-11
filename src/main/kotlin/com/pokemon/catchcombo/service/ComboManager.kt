@@ -83,7 +83,11 @@ class ComboManager {
         }
 
         val chainBroken = oldSpecies != null && !chainContinues && oldCombo > 0
-        val wasNewChain = data.incrementCombo(speciesId)
+
+        // Determine if we need to force chain continue (evolution line match but not exact match)
+        val forceChainContinue = chainContinues && oldSpecies != null && oldSpecies != speciesId
+
+        val wasNewChain = data.incrementCombo(speciesId, forceChainContinue)
 
         // Save to database
         repository?.saveComboData(data)
